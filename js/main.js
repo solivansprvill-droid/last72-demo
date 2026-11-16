@@ -1,5 +1,5 @@
 // 入口：组装 逻辑(game) + 渲染(renderer) + 输入/HUD
-import { Game } from './game/game.js';
+import { Game, ENDINGS } from './game/game.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
@@ -47,6 +47,8 @@ tapBtn('btnBuild', actions.build);
 tapBtn('btnBag', actions.bag);
 tapBtn('btnEat', actions.eat); tapBtn('btnDrink', actions.drink);
 tapBtn('btnHeal', actions.heal);
+tapBtn('btnStay', () => game && game.chooseStay());
+tapBtn('btnWake', () => game && game.wake('你起床了'));
 hud.bind(() => game);
 tapBtn('btnPause', actions.pause);
 document.querySelectorAll('.bbtn').forEach((b) => tapBtn2(b, () => actions.buildType(+b.dataset.i)));
@@ -85,13 +87,19 @@ $('btnStart').addEventListener('click', start);
 $('btnAgain').addEventListener('click', start);
 $('btnHelp').addEventListener('click', () => $('help').classList.toggle('show'));
 
-function endScreen(win) {
+function endScreen() {
   running = false; input.enabled = false;
   if (document.pointerLockElement) document.exitPointerLock();
-  $('endTitle').textContent = win ? '撤离成功' : '失败';
-  $('endTitle').className = win ? 'win' : 'lose';
-  $('endSub').textContent = win ? '你登上了直升机，离开了新曙光市。' : (game.loseReason || '你倒在了末日之中……');
-  $('endStats').innerHTML = `存活 <b>${Math.floor(game.T)}</b> 小时 · 击倒感染者 <b>${game.kills}</b> · 建造工事 <b>${game.placed}</b>`;
+  const E = ENDINGS[game.ending] || ENDINGS.dead;
+  let seen = []; try { seen = JSON.parse(localStorage.getItem('last72_endings') || '[]'); } catch (_) {}
+  if (!seen.includes(game.ending)) { seen.push(game.ending); try { localStorage.setItem('last72_endings', JSON.stringify(seen)); } catch (_) {} }
+  $('endTitle').textContent = E.title;
+  $('endTitle').className = E.win ? 'win' : 'lose';
+  $('endSub').textContent = E.text(game);
+  const alive = game.npcs.joinedAlive().length;
+  $('endStats').innerHTML = `存活 <b>${Math.floor(game.T)}</b> 小时 · 击倒感染者 <b>${game.kills}</b> · 建造工事 <b>${game.placed}</b> · 同伴 <b>${alive}</b>/3`;
+  $('endList').innerHTML = Object.entries(ENDINGS).map(([k, v]) => `<span class="${seen.includes(k) ? 'got' : ''}${k === game.ending ? ' cur' : ''}">${seen.includes(k) ? v.name : '？？？'}</span>`).join('');
+  if (window.__onEnd) window.__onEnd(game.ending);
   setTimeout(() => $('end').classList.add('show'), 600);
 }
 
@@ -109,7 +117,7 @@ function frame() {
     for (const e of game.events) {
       renderer.onEvent(e); hud.onEvent(e);
       if (e.type === 'panel') document.body.classList.toggle('panelOpen', !!e.panel);
-      if (e.type === 'end') endScreen(e.win);
+      if (e.type === 'end') endScreen();
       if (e.type === 'hurt' && navigator.vibrate && isTouch) navigator.vibrate(30);
     }
     game.events.length = 0;

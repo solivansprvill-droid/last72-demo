@@ -44,7 +44,8 @@ export class ZombieManager {
     if (g.npcs) for (const n of g.npcs.list) {
       if (n.dead || !n.met) continue;
       const d = Math.hypot(n.x - zb.x, n.z - zb.z);
-      if (d < bd - 1 && d < 2.2) { bd = d; best = n; }
+      const lim = p.dead || bd > 25 ? 8 : 2.2;
+      if (d < bd - 1 && d < lim && Math.abs(n.y - zb.y) < 2) { bd = d; best = n; }
     }
     return best;
   }
@@ -69,7 +70,7 @@ export class ZombieManager {
         zb.ai = 0.22 + Math.random() * 0.1;
         const sense = (g.isNight() ? 20 : 13) + (zb.state === 'investigate' ? 4 : 0) - (p.sneak ? 5 : 0);
         const upstairs = p.y - zb.y > 1.2 && !p.onTower;
-        const chase = !p.dead && (zb.wave || pd < sense || zb.state === 'chase' && pd < sense + 8);
+        const chase = (!p.dead && (zb.wave || pd < sense || zb.state === 'chase' && pd < sense + 8)) || (tg !== p && d < 8);
         if (zb.state === 'attackBuilding' && zb.target && zb.target.hp > 0 && d > 2) {
           // 继续拆
         } else if (chase) {
@@ -78,7 +79,8 @@ export class ZombieManager {
           else {
             zb.state = 'chase';
             const stair = upstairs && g.stairPath ? g.stairPath(zb, p) : null;
-            if (stair) { zb.tx = stair.x; zb.tz = stair.z; }
+            if (tg !== p) { zb.tx = tg.x; zb.tz = tg.z; }
+            else if (stair) { zb.tx = stair.x; zb.tz = stair.z; }
             else if ((d < 2.6 && dyp < 1.5) || (zb.y > 3 && dyp < 3)) { zb.tx = tg.x; zb.tz = tg.z; }
             else {
               const n = nav.next(zb.x, zb.z);

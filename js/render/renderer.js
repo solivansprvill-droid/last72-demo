@@ -95,6 +95,34 @@ export class Renderer {
     this.lampLights = [];
     for (let i = 0; i < 3; i++) { const L = new BABYLON.PointLight('lamp' + i, new BABYLON.Vector3(0, -50, 0), this.scene); L.diffuse = new BABYLON.Color3(1, 0.9, 0.62); L.specular = new BABYLON.Color3(0, 0, 0); L.range = 10; L.intensity = 0; this.lampLights.push(L); }
 
+    // 幸存者 NPC
+    const mkHuman = (name, shirt, pantsC, hairC, extra) => {
+      const root = new BABYLON.TransformNode(name, this.scene);
+      const b = new GeoBuilder();
+      b.box(-0.3, 0.8, -0.16, 0.3, 1.38, 0.16, shirt); b.box(-0.2, 1.38, -0.2, 0.2, 1.78, 0.2, skin);
+      b.box(-0.21, 1.66, -0.21, 0.21, 1.8, 0.21, hairC); b.box(-0.21, 1.5, -0.21, 0.21, 1.66, -0.15, hairC);
+      b.box(-0.12, 1.54, 0.2, -0.05, 1.6, 0.215, [0.1, 0.1, 0.1]); b.box(0.05, 1.54, 0.2, 0.12, 1.6, 0.215, [0.1, 0.1, 0.1]);
+      if (extra) extra(b);
+      const body = this.meshFrom(name + 'B', b); body.parent = root;
+      const lg = new GeoBuilder(); lg.box(-0.12, -0.8, -0.12, 0.12, 0, 0.12, pantsC); lg.box(-0.13, -0.8, -0.13, 0.13, -0.68, 0.16, [0.12, 0.12, 0.12]);
+      const L = this.meshFrom(name + 'L', lg); L.parent = root; L.position.set(-0.14, 0.8, 0);
+      const R = this.meshFrom(name + 'R', lg); R.parent = root; R.position.set(0.14, 0.8, 0);
+      const ag = new GeoBuilder(); ag.box(-0.1, -0.6, -0.1, 0.1, 0, 0.1, shirt); ag.box(-0.09, -0.72, -0.09, 0.09, -0.6, 0.09, skin);
+      const AL = this.meshFrom(name + 'AL', ag); AL.parent = root; AL.position.set(-0.4, 1.36, 0);
+      const AR = this.meshFrom(name + 'AR', ag); AR.parent = root; AR.position.set(0.4, 1.36, 0);
+      root.setEnabled(false);
+      return { root, body, L, R, AL, AR };
+    };
+    this.npcModels = {
+      doctor: mkHuman('npcDoc', [0.88, 0.9, 0.9], [0.3, 0.42, 0.5], [0.2, 0.18, 0.16], (b) => { b.box(-0.31, 0.75, -0.17, 0.31, 0.85, 0.17, [0.88, 0.9, 0.9]); b.box(-0.06, 1.1, 0.16, 0.06, 1.3, 0.18, [0.8, 0.2, 0.18]); b.box(-0.25, 1.2, 0.16, -0.06, 1.25, 0.18, [0.2, 0.22, 0.25]); }),
+      engineer: mkHuman('npcEng', [0.36, 0.38, 0.42], [0.25, 0.27, 0.3], [0.5, 0.5, 0.5], (b) => { b.box(-0.31, 0.95, -0.17, 0.31, 1.32, 0.17, [0.92, 0.55, 0.12]); b.box(-0.24, 1.76, -0.24, 0.24, 1.9, 0.24, [0.95, 0.75, 0.15]); b.box(-0.32, 0.8, -0.18, 0.32, 0.88, 0.18, [0.3, 0.22, 0.14]); }),
+      hunter: mkHuman('npcHun', [0.3, 0.4, 0.26], [0.26, 0.24, 0.2], [0.1, 0.09, 0.08], (b) => { b.box(-0.24, 0.9, -0.3, 0.24, 1.32, -0.16, [0.36, 0.3, 0.2]); b.box(0.15, 0.85, -0.34, 0.22, 1.7, -0.27, [0.45, 0.32, 0.18]); b.box(-0.22, 1.78, -0.22, 0.22, 1.86, 0.22, [0.24, 0.3, 0.2]); }),
+    };
+    const cbg = new GeoBuilder(); cbg.box(-0.04, -0.75, -0.05, 0.04, -0.65, 0.8, [0.4, 0.3, 0.18]); cbg.box(-0.3, -0.74, 0.55, 0.3, -0.68, 0.62, [0.3, 0.3, 0.32]);
+    const cb = this.meshFrom('xbow', cbg); cb.parent = this.npcModels.hunter.AR;
+    this.tracers = [];
+    const tm = new BABYLON.StandardMaterial('tm', this.scene); tm.disableLighting = true; tm.emissiveColor = new BABYLON.Color3(1, 0.85, 0.5);
+    for (let i = 0; i < 4; i++) { const t = BABYLON.MeshBuilder.CreateBox('tr' + i, { width: 0.05, height: 0.05, depth: 1 }, this.scene); t.material = tm; t.isPickable = false; t.setEnabled(false); this.tracers.push({ m: t, life: 0 }); }
     // 感染者（风格化体素人形，无血腥）
     const zskin = [0.46, 0.55, 0.45], eye = [0.95, 0.66, 0.2];
     const mkBody = (shirt, pantsC, kind) => {
@@ -261,6 +289,19 @@ export class Renderer {
     const lit = (game.litLamps || []).slice().sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
     this.lampLights.forEach((L, i) => { const l = lit[i]; if (l) { L.position.set(l.x + 0.5, l.y + 2.2, l.z + 0.5); L.intensity = 1.1; } else L.intensity = 0; });
 
+    // 幸存者
+    if (game.npcs) for (const n of game.npcs.list) {
+      const M = this.npcModels[n.id]; if (!M) continue;
+      const vis = !n.dead && Math.hypot(n.x - p.x, n.z - p.z) < this.viewDist;
+      M.root.setEnabled(vis); if (!vis) continue;
+      M.root.position.set(n.x, n.y, n.z); M.root.rotation.y = n.yaw;
+      const mv2 = Math.hypot(n.x - (n._rx ?? n.x), n.z - (n._rz ?? n.z)); n._rx = n.x; n._rz = n.z;
+      const s2 = mv2 > 0.003 ? Math.sin(n.walk * 2.6) * 0.7 : 0;
+      M.L.rotation.x = s2; M.R.rotation.x = -s2; M.AL.rotation.x = -s2 * 0.7;
+      M.AR.rotation.x = n.swing > 0 ? -1.5 : (n.id === 'hunter' ? -1.1 : s2 * 0.6);
+      const fl = n.flash > 0 ? 1.8 : 1; M.body.scaling.set(1, 1, 1); M.body.visibility = 1; void fl;
+    }
+    for (const t of this.tracers) { if (t.life > 0) { t.life -= dt; if (t.life <= 0) t.m.setEnabled(false); } }
     // 感染者
     this.updateZombies(game, dt);
     // 碎块
@@ -389,6 +430,14 @@ export class Renderer {
         this.shake = Math.max(this.shake || 0, 0.6 * Math.max(0.2, 1 - Math.hypot(e.x - this.player.position.x, e.z - this.player.position.z) / 18));
         this.flashT = 0.25; break;
       }
+      case 'shot': {
+        const t = this.tracers.find(x => x.life <= 0) || this.tracers[0];
+        const dx = e.x1 - e.x0, dy = e.y1 - e.y0, dz = e.z1 - e.z0, L = Math.hypot(dx, dy, dz);
+        t.m.position.set((e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2, (e.z0 + e.z1) / 2); t.m.scaling.set(1, 1, L);
+        t.m.lookAt(new (BJ().Vector3)(e.x1, e.y1, e.z1)); t.m.setEnabled(true); t.life = 0.1;
+        this.spawnDebris(e.x1, e.y1, e.z1, [0.6, 0.62, 0.58], 2, 0.1, 2); break;
+      }
+      case 'npcDown': this.spawnDebris(e.x, e.y + 1, e.z, [0.6, 0.6, 0.6], 6, 0.2, 2); break;
       case 'stomp': this.spawnDebris(e.x, 1.1, e.z, [0.4, 0.38, 0.35], 6, 0.22, 4); this.shake = Math.max(this.shake || 0, 0.25); break;
       case 'zdeath': { // 碎成方块
         const shirt = { runner: [0.45, 0.16, 0.15], climber: [0.34, 0.3, 0.42], bloater: [0.46, 0.44, 0.26], boss: [0.32, 0.26, 0.22] }[e.ztype] || [0.26, 0.33, 0.42];

@@ -5,6 +5,7 @@ import { moveEntity, collides } from './physics.js';
 import { Nav } from './nav.js';
 import { ZombieManager, MAX_Z, ZTYPES, EXPLODE } from './zombies.js';
 import { ITEMS, RECIPES, FIST, Inventory, rollLoot, itemName } from './items.js';
+import { NpcManager } from './npcs.js';
 import { BUILDS, BUILD_BY_ID, canPlace, placeStruct, removeStruct, setDoor, setLamp, GEN_RANGE, LAMP_RADIUS, FUEL_HOURS } from './builds.js';
 
 export let HOUR_SEC = 13;            // 1 游戏小时 = 13 秒
@@ -22,6 +23,14 @@ export const WAVES = [
 ];
 function pickMix(mix) { let r = Math.random(), last = 'walker'; for (const k in mix) { last = k; r -= mix[k]; if (r <= 0) return k; } return last; }
 export const AIRDROPS = [30, 54];
+const SLEEP_INPUT = { mx: 0, mz: 0, run: false, jump: false, camYaw: 0, ghostCell: null };
+export const ENDINGS = {
+  all: { name: '全员撤离', win: true, title: '结局：全员撤离', text: (g) => `你和${(g.companions || []).join('、')}一起登上了直升机。新曙光市在身后渐渐远去——你们都活下来了。` },
+  alone: { name: '独自撤离', win: true, title: '结局：独自撤离', text: (g) => (g.companions && g.companions.length ? `你带着${g.companions.join('、')}登上了直升机，但还有人没能一起离开……` : '螺旋桨的轰鸣盖过了一切。你独自离开了这座城市，带着幸存者的记忆。') },
+  stay: { name: '留守', win: true, title: '结局：留守', text: (g) => (g.staying ? '直升机远去，你选择留下守护这片街区的最后一盏灯，等待下一班救援。' : '你错过了直升机。好在防线还在——你决定留守到底，等待下一次机会。') },
+  infected: { name: '感染', win: false, title: '结局：感染', text: () => '伤口的感染终于压垮了你。在意识模糊之前，你把最后的物资留给了后来的人。' },
+  dead: { name: '阵亡', win: false, title: '结局：阵亡', text: (g) => g.loseReason || '你倒在了尸潮之中……新曙光市又少了一位幸存者。' },
+};
 
 export const MISSIONS = [
   { id: 'wake', text: '醒来：走动一下，熟悉操作' },
@@ -44,13 +53,15 @@ export class Game {
     this.world = generateWorld(72);
     this.nav = new Nav(this.world);
     this.climbNav = new Nav(this.world, true);
+    this.npcs = new NpcManager(this);
     this.zm = new ZombieManager(this);
     this.events = [];
     this.player = {
       x: START.x, y: START.y, z: START.z, vy: 0, hw: 0.3, h: 1.75, onGround: false, canStep: true, yaw: 0,
       hp: 100, hunger: 80, thirst: 70, stamina: 100, dead: false, atkCd: 0, swing: 0, walk: 0,
-      moved: 0, hurtT: 0, running: false,
+      moved: 0, hurtT: 0, running: false, fatigue: 10, infect: 0,
     };
+    this.sleeping = false; this.staying = false; this.ending = null;
     this.inv = new Inventory(16);
     this.equip = null; // {id, n:1, dur}
     this.T = 0; this.time = 0;
@@ -70,6 +81,7 @@ export class Game {
     if (opts.hourSec) HOUR_SEC = opts.hourSec;
   }
   emit(e) { this.events.push(e); }
+  hourSec() { return HOUR_SEC; }
   toast(text, short) { this.emit({ type: 'toast', text, short }); }
   clockHour() { return (START_CLOCK + this.T) % 24; }
   day() { return Math.floor((START_CLOCK + this.T) / 24) + 1; }
@@ -97,31 +109,85 @@ export class Game {
   update(dt, input) {
     if (this.state !== 'play') return;
     dt = Math.min(dt, 0.05);
+    // 睡眠：时间加速（逻辑分步保证稳定）
+    const steps = this.sleeping ? 10 : 1;
+    for (let i = 0; i < steps && this.state === 'play'; i++) this.step(dt, i === 0 ? input : SLEEP_INPUT);
+  }
+  step(dt, input) {
     this.time += dt;
     this.T += dt / HOUR_SEC;
     const p = this.player;
+    if (this.sleeping) input = SLEEP_INPUT;
     this.updatePlayer(dt, input);
     this.nav.update(dt, p.x, p.z);
     this.zm.update(dt);
+    this.npcs.update(dt);
     this.updatePower(dt);
     this.director(dt);
     this.updateMission();
+    if (this.sleeping) this.updateSleep(dt);
     if (this.buildMode) this.updateGhost(input.ghostCell);
     this.focusT -= dt; if (this.focusT <= 0) { this.focusT = 0.12; this.focus = this.findFocus(); }
     if (this.panel && !this.panelValid()) this.closePanel();
-    if (p.hp <= 0 && !p.dead) { p.dead = true; this.state = 'lose'; this.emit({ type: 'end', win: false }); }
-    if (this.evacActive && Math.hypot(p.x - EVAC.x, p.z - EVAC.z) < EVAC.r) { this.state = 'win'; this.emit({ type: 'end', win: true }); }
     this.updateRegion();
-    if (this.T >= this.evacLeave && this.state === 'play') { this.state = 'lose'; this.loseReason = '撤离直升机已经离开'; this.emit({ type: 'end', win: false }); }
+    this.checkEnd();
   }
-
+  checkEnd() {
+    const p = this.player;
+    if (p.hp <= 0 && !p.dead) { p.dead = true; this.finish('dead'); return; }
+    if (p.infect >= 100) { this.finish('infected'); return; }
+    if (this.evacActive && !this.staying && Math.hypot(p.x - EVAC.x, p.z - EVAC.z) < EVAC.r && p.y < 4) {
+      const comp = this.npcs.joinedAlive().filter(n => Math.hypot(n.x - p.x, n.z - p.z) < 16);
+      this.companions = comp.map(n => n.name);
+      this.finish(comp.length === 3 ? 'all' : 'alone'); return;
+    }
+    if (this.T >= this.evacLeave) this.finish('stay');
+  }
+  finish(id) {
+    if (this.state !== 'play') return;
+    this.ending = id; this.state = ENDINGS[id].win ? 'win' : 'lose';
+    this.sleeping = false;
+    this.emit({ type: 'end', win: ENDINGS[id].win, ending: id });
+  }
+  chooseStay() {
+    if (!this.evacActive || this.staying || this.state !== 'play') return;
+    this.staying = true;
+    this.emit({ type: 'banner', text: '你选择了留守！', sub: `守住基地，坚持到第 ${this.evacLeave} 小时`, kind: 'wave' });
+    this.activeWave = { name: '留守之夜', idx: 3, spawned: 0, count: 16, mix: { walker: 0.4, runner: 0.3, climber: 0.2, bloater: 0.1 }, start: this.T };
+    this.emit({ type: 'wave' });
+  }
+  // ---------- 睡眠 / 疲劳 ----------
+  sleepLabel() { return this.sleeping ? '起床' : `睡觉（疲劳 ${Math.round(this.player.fatigue)}）`; }
+  sleep() {
+    if (this.sleeping) { this.wake('你起床了'); return; }
+    const p = this.player;
+    if (this.activeWave) { this.toast('尸潮来袭，现在不能睡！'); return; }
+    if (this.zm.list.some(z => Math.hypot(z.x - p.x, z.z - p.z) < 14 && Math.abs(z.y - p.y) < 4)) { this.toast('附近有感染者，睡不着'); return; }
+    if (p.fatigue < 15) { this.toast('你还不困'); return; }
+    this.sleeping = true; this.buildMode = false; this.closePanel();
+    this.emit({ type: 'sleep', on: true });
+    this.toast('你躺下休息……（时间加速，疲劳恢复）');
+  }
+  wake(msg) { if (!this.sleeping) return; this.sleeping = false; this.emit({ type: 'sleep', on: false }); if (msg) this.toast(msg); }
+  updateSleep(dt) {
+    const p = this.player;
+    p.fatigue = Math.max(0, p.fatigue - 14 * dt / HOUR_SEC);
+    if (p.fatigue <= 2) this.wake('你睡醒了，精神恢复');
+    else if (this.zm.list.some(z => Math.hypot(z.x - p.x, z.z - p.z) < 9 && Math.abs(z.y - p.y) < 4)) this.wake('有动静！你惊醒了');
+    else { const wv = this.waves[this.waveIdx]; if (wv && this.T >= wv.warn - 0.05) this.wake('警报声把你吵醒了'); }
+  }
   updatePlayer(dt, inp) {
     const p = this.player;
     const hr = dt / HOUR_SEC;
     p.hunger = Math.max(0, p.hunger - 2.4 * hr);
     p.thirst = Math.max(0, p.thirst - 3.4 * hr);
+    // 疲劳：随时间、奔跑、战斗增加；睡觉恢复
+    p.fatigue = Math.min(100, p.fatigue + (this.sleeping ? 0 : 1.5 * hr + (p.running ? 0.035 * dt : 0)));
+    // 感染：被咬后上升；超过 50 会自行恶化
+    if (p.infect >= 50) p.infect = Math.min(100, p.infect + 1.2 * hr);
+    if (p.infect >= 80 && Math.random() < dt * 0.05) this.toast('感染正在恶化！尽快服用药品或找医生');
     if (p.hunger <= 0 || p.thirst <= 0) { p.hp -= 1.2 * dt; if (Math.random() < dt * 0.3) this.toast(p.hunger <= 0 ? '饥饿正在伤害你！' : '口渴正在伤害你！'); }
-    else if (p.hunger > 50 && p.thirst > 50 && p.hp < 100) p.hp = Math.min(100, p.hp + 0.6 * dt);
+    else if (p.hp > 0 && p.hunger > 50 && p.thirst > 50 && p.hp < 100 && p.infect < 50) p.hp = Math.min(100, p.hp + 0.6 * dt);
     p.hurtT = Math.max(0, p.hurtT - dt);
     const cy = inp.camYaw;
     let mx = inp.mx, mz = inp.mz; const ml = Math.hypot(mx, mz);
@@ -131,8 +197,9 @@ export class Game {
     p.kx = (p.kx || 0) * Math.max(0, 1 - dt * 5); p.kz = (p.kz || 0) * Math.max(0, 1 - dt * 5);
     const moving = ml > 0.1;
     p.running = moving && inp.run && p.stamina > 3;
-    const speed = p.running ? 6.6 : 4.2;
-    if (p.running) p.stamina = Math.max(0, p.stamina - 16 * dt); else p.stamina = Math.min(100, p.stamina + (moving ? 10 : 18) * dt);
+    const tired = p.fatigue > 90 ? 0.8 : 1;
+    const speed = (p.running ? 6.6 : 4.2) * tired;
+    if (p.running) p.stamina = Math.max(0, p.stamina - 16 * dt); else p.stamina = Math.min(100, p.stamina + (moving ? 10 : 18) * dt * (p.fatigue > 70 ? 0.5 : 1));
     vx *= speed; vz *= speed;
     if (moving) { const ty = Math.atan2(vx, vz); p.yaw += ang(ty - p.yaw) * Math.min(1, dt * 12); }
     if (inp.jump && p.onGround && p.stamina >= 5) { p.vy = 8.2; p.stamina -= 5; p.onGround = false; this.emit({ type: 'jump' }); }
@@ -160,7 +227,7 @@ export class Game {
     const p = this.player;
     if (p.atkCd > 0) return;
     const wp = this.weapon();
-    p.atkCd = wp.cd; p.swing = 0.3;
+    p.atkCd = wp.cd; p.swing = 0.3; p.fatigue = Math.min(100, p.fatigue + 0.12);
     const weak = p.stamina < 5;
     p.stamina = Math.max(0, p.stamina - 6);
     this.emit({ type: 'swing' });
@@ -250,6 +317,10 @@ export class Game {
       else if (def.tower) consider(score, { kind: 'tower', s, label: '登上瞭望塔' });
       else if (s.hp < s.max) consider(score + 0.5, { kind: 'repair', s, label: `修理 ${def.name}（${this.costText(this.repairCost(s))}）` });
     }
+    for (const n of this.npcs.list) {
+      if (n.dead) continue; const d = Math.hypot(n.x - p.x, n.z - p.z);
+      if (d < 2.8 && Math.abs(n.y - p.y) < 2) consider(d + facing(n.x, n.z) * 0.6 - 0.4, { kind: 'npc', n, s: n, label: `与${n.role}${n.name}对话` });
+    }
     this.extraFocus(consider, facing);
     const o = this.forwardObject();
     if (o) consider(1.2, { kind: 'harvest', o, label: `采集 ${o.name}` });
@@ -297,6 +368,7 @@ export class Game {
         p.vy = 0; break;
       }
       case 'repair': this.repair(f.s); break;
+      case 'npc': this.openPanel({ kind: 'npc', s: f.n }); break;
       case 'harvest': this.harvest(f.o, this.weapon().harvest); break;
       default: this.doExtra(f);
     }
@@ -405,6 +477,7 @@ export class Game {
   panelValid() {
     const pn = this.panel, p = this.player; if (!pn) return false;
     const t = pn.s; if (!t) return true;
+    if (pn.kind === 'npc') return !t.dead && Math.hypot(t.x - p.x, t.z - p.z) < 4.5;
     if (t.cells && t.hp !== undefined && t.hp <= 0) return false;
     const x = t.x !== undefined ? t.x : t.cells[0][0], z = t.z !== undefined ? t.z : t.cells[0][2];
     return Math.hypot(x + 0.5 - p.x, z + 0.5 - p.z) < 3.6;
@@ -480,7 +553,7 @@ export class Game {
     const pn = this.panel; if (!pn || pn.kind !== 'storage') return;
     for (let i = this.inv.slots.length - 1; i >= 0; i--) { const s = this.inv.slots[i]; if (ITEMS[s.id].cat === 'mat') this.storeSlot(i); }
   }
-  repairCost(s) { const def = BUILD_BY_ID[s.type]; const c = {}; for (const k in def.cost) c[k] = Math.ceil(def.cost[k] / 2); return c; }
+  repairCost(s) { const def = BUILD_BY_ID[s.type]; const c = {}; const k2 = this.engineerNear() ? 0.35 : 0.5; for (const k in def.cost) c[k] = Math.max(1, Math.ceil(def.cost[k] * k2)); return c; }
   canAfford(c) { return this.inv.has(c); }
   pay(c) { this.inv.pay(c); }
   costText(c) { return Object.entries(c).map(([k, v]) => `${itemName(k)}${v}`).join(' '); }
@@ -510,7 +583,8 @@ export class Game {
   // ---------- 建造 ----------
   toggleBuild() { this.buildMode = !this.buildMode; if (this.buildMode && this.panel) this.closePanel(); this.emit({ type: 'buildMode', on: this.buildMode }); }
   setBuildType(i) { if (i < 0 || i >= BUILDS.length) return; this.buildType = i; if (!this.buildMode) this.toggleBuild(); }
-  buildCost(def) { return def.cost; }
+  engineerNear() { return this.npcs.near('engineer', 12) && this.npcs.get('engineer').morale >= 15; }
+  buildCost(def) { if (!this.engineerNear()) return def.cost; const c = {}; for (const k in def.cost) c[k] = Math.max(1, Math.ceil(def.cost[k] * 0.75)); return c; }
   updateGhost(cell) {
     const p = this.player; const def = BUILDS[this.buildType];
     let gx, gz, gy = Math.floor(p.y + 0.05);
@@ -586,11 +660,21 @@ export class Game {
     for (const l of this.litLamps) if (Math.hypot(l.x + 0.5 - x, l.z + 0.5 - z) < LAMP_RADIUS) return l;
     return null;
   }
-  damagePlayer(dmg) {
+  damagePlayer(dmg, src) {
     const p = this.player; if (p.dead) return;
+    if (this.sleeping) this.wake('你被袭击惊醒了！');
     p.hp -= dmg; p.hurtT = 0.4;
+    if (src && src.type && src.type !== 'bloater' && Math.random() < 0.55) { const inc = src.big ? 10 : 3 + Math.floor(Math.random() * 5); p.infect = Math.min(100, p.infect + inc); if (p.infect >= 30 && !this._infWarn) { this._infWarn = true; this.toast('你被咬伤了，感染风险上升！服用药品可降低'); } }
+    if (p.hp <= 0) this.loseReason = src && src.type === 'boss' ? '巨型感染者的重击让你再也没能站起来……' : (src && src.type === 'bloater' ? '爆裂者的冲击把你掀翻在地……' : null);
     this.emit({ type: 'hurt', dmg });
   }
+  damageNpc(n, dmg) {
+    if (n.dead) return;
+    n.hp -= dmg; n.flash = 0.2; n.morale = Math.max(0, n.morale - 1);
+    this.emit({ type: 'npcHit', x: n.x, y: n.y + 1.2, z: n.z, dmg });
+    if (n.hp <= 0) { n.dead = true; n.joined = false; this.emit({ type: 'banner', text: `${n.role} ${n.name} 倒下了……`, sub: '感染者太多了', kind: 'wave' }); this.emit({ type: 'npcDown', x: n.x, y: n.y, z: n.z, id: n.id }); }
+  }
+  npcCommand(id, c) { const n = this.npcs.get(id); if (n) this.npcs.command(n, c); }
   onZombieDeath(zb) {
     this.kills++;
     this.emit({ type: 'zdeath', x: zb.x, y: zb.y, z: zb.z, ztype: zb.type, id: zb.id });
@@ -636,7 +720,7 @@ export class Game {
       const remaining = this.zm.list.filter(z => z.wave === aw.idx + 1).length;
       if (aw.spawned >= aw.count && remaining === 0) {
         if (aw.idx === 0) this.wave1Cleared = true;
-        this.emit({ type: 'banner', text: `${aw.name}已击退！`, sub: aw.idx < 2 ? '趁天亮补充物资、修理工事' : '坚持住，直升机快到了', kind: 'ok' });
+        this.emit({ type: 'banner', text: `${aw.name}已击退！`, sub: aw.idx < 2 ? '趁天亮补充物资、修理工事' : (aw.idx === 2 ? '坚持住，直升机快到了' : '天快亮了，再坚持一下'), kind: 'ok' });
         this.activeWave = null;
       } else if (T > aw.start + 5 && aw.idx === 0 && aw.spawned >= aw.count) { this.wave1Cleared = true; }
     }

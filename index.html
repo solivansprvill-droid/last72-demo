@@ -28,6 +28,8 @@
     <div class="stat"><label>饱食</label><div class="bar food"><i id="foodBar"></i></div><button id="btnEat" class="mini">吃</button></div>
     <div class="stat"><label>水分</label><div class="bar water"><i id="waterBar"></i></div><button id="btnDrink" class="mini">喝</button></div>
     <div class="stat"><label>体力</label><div class="bar st"><i id="stBar"></i></div></div>
+    <div class="stat"><label>疲劳</label><div class="bar fat"><i id="fatBar"></i></div></div>
+    <div class="stat"><label>感染</label><div class="bar inf"><i id="infBar"></i></div></div>
     <div class="stat"><label>武器</label><span id="weaponTxt">徒手</span><button id="btnHeal" class="mini">疗</button></div>
     <div id="res"></div>
   </div>
@@ -37,6 +39,9 @@
   <div id="toasts"></div>
   <div id="bossBar"><span>巨型感染者</span><div class="bar"><i id="bossHp"></i></div></div>
   <div id="hint"></div>
+  <button id="btnStay">选择留守</button>
+  <div id="sleepOv"><b>睡眠中…</b><span>时间加速 · 疲劳恢复</span><button id="btnWake">起床</button></div>
+  <div id="party"></div>
   <div id="bag" class="panel">
     <div class="pTitle"><span>背包 <small id="bagCap"></small></span><button id="btnSort" class="mini">整理</button><button id="btnBagClose" class="mini">✕</button></div>
     <div id="equipRow"></div>
@@ -87,7 +92,7 @@
 <div id="pause" class="overlay"><div class="card small"><h2>暂停</h2><button id="btnResume" class="primary">继续</button><button id="btnQuit" class="ghostBtn">返回标题</button></div></div>
 
 <div id="end" class="overlay"><div class="card small">
-  <h1 id="endTitle">失败</h1><p id="endSub"></p><p id="endStats"></p>
+  <h1 id="endTitle">失败</h1><p id="endSub"></p><p id="endStats"></p><div id="endList"></div>
   <button id="btnAgain" class="primary">再来一次</button>
 </div></div>
 

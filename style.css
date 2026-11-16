@@ -135,3 +135,19 @@ body.touch .bexit { left: 140px; transform: none; bottom: 64px; }
 #bigmap { position: absolute; inset: 0; background: rgba(8,9,12,.82); display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
 #bigmap.show { display: flex; } #bigmap canvas { height: 84vh; width: auto; image-rendering: pixelated; border: 2px solid #33343c; } #bigmap p { font-size: 11px; color: #aaa; margin: 6px; }
 @media (max-height: 500px) { #minimap { width: 96px; height: 96px; } #tl { left: calc(max(8px, env(safe-area-inset-left)) + 104px); max-width: 40vw; } }
+.bar.fat i { background: #8a7fb8; } .bar.inf i { background: #6fbf5a; }
+#btnStay { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: none; pointer-events: auto; background: rgba(60,30,20,.9); color: #f2d6a0; border: 2px solid #b8402f; padding: 5px 12px; font-size: 13px; }
+#sleepOv { position: absolute; inset: 0; background: rgba(5,6,12,.72); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; pointer-events: auto; color: #cfd6e0; z-index: 6; }
+#sleepOv b { font-size: 22px; color: #8fc0ea; } #sleepOv button { background: #3a3b42; color: #fff; border: 1px solid #666; padding: 8px 18px; font-size: 14px; }
+body.sleeping #sleepOv { display: flex; }
+#party { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 150px; display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
+#party .pm { background: rgba(14,15,19,.62); border-left: 3px solid #7fe08a; padding: 2px 6px; min-width: 120px; }
+#party .pm i { display: block; height: 3px; background: #c9473a; margin-top: 2px; }
+#party .pm.dead { border-color: #666; color: #777; }
+.npcTalk { color: #e8e2d2; line-height: 1.5; margin: 4px 0 6px; }
+.npcStat { color: #aaa; font-size: 11px; margin-bottom: 4px; }
+.npcBtns { display: flex; flex-wrap: wrap; gap: 4px; } .npcBtns button.on { border-color: #f0b54a !important; color: #f0b54a; }
+@media (max-height: 500px) { #party { top: 104px; } #tr .stat { height: 13px; margin: 1px 0; } #btnStay { top: 70px; } }
+#endTitle { font-size: 28px; } #endSub { font-size: 13px; color: #c9c3b8; line-height: 1.6; }
+#endList { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; } #endList span { font-size: 11px; padding: 2px 6px; border: 1px solid #44454d; color: #777; } #endList span.got { color: #f2d6a0; border-color: #8a6a2a; } #endList span.cur { background: #8a6a2a; color: #fff; }
+#side, #bag { background: rgba(16,17,22,.96); }
