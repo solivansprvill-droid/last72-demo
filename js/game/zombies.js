@@ -68,7 +68,7 @@ export class ZombieManager {
       zb.ai -= fdt;
       if (zb.ai <= 0) { // 分帧决策
         zb.ai = 0.22 + Math.random() * 0.1;
-        const sense = (g.isNight() ? 20 : 13) + (zb.state === 'investigate' ? 4 : 0) - (p.sneak ? 5 : 0);
+        const sense = (g.isNight() ? 20 : 13) + (zb.state === 'investigate' ? 4 : 0) - (p.sneak ? 5 : 0) - g.weatherSense();
         const upstairs = p.y - zb.y > 1.2 && !p.onTower;
         const chase = (!p.dead && (zb.wave || pd < sense || zb.state === 'chase' && pd < sense + 8)) || (tg !== p && d < 8);
         if (zb.state === 'attackBuilding' && zb.target && zb.target.hp > 0 && d > 2) {

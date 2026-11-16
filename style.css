@@ -151,3 +151,24 @@ body.sleeping #sleepOv { display: flex; }
 #endTitle { font-size: 28px; } #endSub { font-size: 13px; color: #c9c3b8; line-height: 1.6; }
 #endList { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; } #endList span { font-size: 11px; padding: 2px 6px; border: 1px solid #44454d; color: #777; } #endList span.got { color: #f2d6a0; border-color: #8a6a2a; } #endList span.cur { background: #8a6a2a; color: #fff; }
 #side, #bag { background: rgba(16,17,22,.96); }
+.row2 { display: flex; gap: 6px; } .row2 .ghostBtn { flex: 1; }
+.primary.cont { background: #2f6fa8; border-bottom-color: #173a5a; margin-bottom: 0; }
+.setBox { display: none; text-align: left; font-size: 13px; margin: 8px 0; background: rgba(255,255,255,.04); padding: 8px 10px; }
+.setBox.show { display: block; } .setBox label { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: #ccc; } .setBox input[type=range] { flex: 1; } .setBox select { flex: 1; background: #23242a; color: #fff; border: 1px solid #555; padding: 4px; }
+#pause .ghostBtn, #end .ghostBtn { margin-top: 6px; }
+#flash { position: absolute; inset: 0; background: #fff1c8; opacity: 0; pointer-events: none; }
+#dmgNums { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dmg { position: absolute; transform: translate(-50%, -50%); font-weight: 800; font-size: 14px; color: #f2d6a0; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; animation: dmgUp .75s ease-out forwards; }
+.dmg.big { color: #ff8a5a; font-size: 18px; } .dmg.me { color: #ff5a4a; font-size: 15px; }
+@keyframes dmgUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -36px; } }
+.endArt { height: 64px; margin: -6px auto 4px; width: 200px; background-repeat: no-repeat; background-position: center; image-rendering: pixelated; }
+.endArt.all, .endArt.alone { background: linear-gradient(#0000 60%, #3a3f46 60%), radial-gradient(circle at 50% 40%, #f0b54a 0 10px, #0000 11px), linear-gradient(90deg, #0000 30%, #2d3a2d 30% 70%, #0000 70%); }
+.endArt.stay { background: radial-gradient(circle at 50% 55%, #ffd98a 0 8px, #0000 9px), linear-gradient(#0000 70%, #4a3826 70%); }
+.endArt.infected { background: radial-gradient(circle at 50% 50%, #6fbf5a 0 14px, #0000 15px); }
+.endArt.dead { background: linear-gradient(#0000 65%, #5a2a22 65% 75%, #0000 75%); }
+@media (max-height: 500px) {
+  #tl { font-size: 10.5px; line-height: 1.35; padding: 4px 6px; } #clock { font-size: 13px; }
+  #tr { width: 150px; font-size: 10px; padding: 4px 34px 4px 6px; } .r { font-size: 10px; padding: 0 3px; }
+  #toasts { top: 32%; } .toast { font-size: 12px; }
+  .card { padding: 12px 16px; } h1 { font-size: 26px; } h1 span { font-size: 19px; } .lead { font-size: 12px; margin: 4px 0; } .primary { padding: 9px; margin: 8px 0 6px; font-size: 16px; }
+}

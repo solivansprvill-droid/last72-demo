@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#111216">
-<title>方块末日：最后72小时 · LAST 72 HOURS（试玩版）</title>
+<title>方块末日：最后72小时 · LAST 72 HOURS</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -64,36 +64,57 @@
   <div id="joyBase"><div id="joyKnob"></div></div>
   <div id="keysHint">WASD 移动 · Shift 奔跑 · 空格 跳 · 左键 攻击/采集 · 右键拖动 转视角 · E 交互 · B 建造(1-0) · F 吃 · G 喝 · H 治疗 · Tab 背包 · Esc 暂停</div>
   <div id="vignette"></div>
+  <div id="flash"></div>
+  <div id="dmgNums"></div>
 </div>
 
 <!-- 标题 -->
 <div id="title" class="overlay">
   <div class="card">
-    <div class="tags"><span class="orig">原创作品</span><span class="trial">试玩版</span></div>
+    <div class="tags"><span class="orig">原创作品</span><span class="trial">正式版 v1.0</span></div>
     <h1>方块末日<span>：最后72小时</span></h1>
     <h2>LAST 72 HOURS</h2>
-    <p class="lead">新曙光市沦陷。收集物资、建造防线、熬过三夜尸潮，<br>在第 72 小时登上北部撤离点的直升机。</p>
-    <button id="btnStart" class="primary">开始游戏</button>
-    <button id="btnHelp" class="ghostBtn">操作说明</button>
+    <p class="lead">新曙光市沦陷。你在公寓里醒来，距离军方最后一次撤离还有 72 小时。<br>搜刮物资、建造防线、招募幸存者、修复电台——活着抵达北部撤离区。</p>
+    <button id="btnContinue" class="primary cont">继续游戏</button>
+    <button id="btnStart" class="primary">新游戏</button>
+    <div class="row2"><button id="btnHelp" class="ghostBtn">操作说明</button><button id="btnSettings2" class="ghostBtn">设置</button></div>
+    <div id="setBox2" class="setBox"></div>
     <div id="help">
-      <div class="col"><h3>手机</h3>
-        <p>左下拖动：移动（推到底奔跑）</p><p>右侧拖动：旋转视角</p><p>点按物体：采集 / 攻击</p>
-        <p>按钮：攻击 · 跳跃 · 交互(修理) · 建造 · 背包</p><p>建造模式：点地面选位置，按“放置”</p></div>
+      <div class="col"><h3>手机（横屏）</h3>
+        <p>左下拖动：移动（推到底奔跑）</p><p>右侧拖动：旋转视角 · 点按物体：采集/攻击</p>
+        <p>按钮：攻击 · 跳跃 · 交互 · 建造 · 背包</p><p>建造：点地面选位置，按“放置”</p><p>点左上小地图：查看大地图</p></div>
       <div class="col"><h3>电脑</h3>
-        <p>WASD 移动 · Shift 奔跑 · 空格 跳</p><p>鼠标左键：攻击 / 采集（首次点击锁定鼠标）</p>
-        <p>E 交互/修理 · B 建造 · 1/2/3 选木墙/路障/尖刺</p><p>F 吃 · G 喝 · Tab 背包 · Esc 暂停</p></div>
-      <p class="tip">木墙=木4　路障=木3+铁2　尖刺陷阱=铁2+石2　·　对已受损的工事再次放置或按交互可修理</p>
+        <p>WASD 移动 · Shift 奔跑 · 空格 跳</p><p>鼠标左键：攻击/采集（首次点击锁定鼠标）</p>
+        <p>E 交互 · B 建造（1–0 选择工事）</p><p>F 吃 · G 喝 · H 治疗 · Tab 背包 · M 地图 · Esc 暂停</p></div>
+      <p class="tip">第 1 夜、第 2 夜、第 3 夜各有一次尸潮，最终尸潮会出现巨型感染者。工作台可合成武器与补给；发电机加燃油后为照明灯供电，夜间可驱赶感染者。招募医生、工程师、猎人，带上所有人撤离才能达成“全员撤离”。</p>
     </div>
-    <p class="foot rot">手机建议横屏游玩，竖屏也可操作</p>
-    <p class="foot">体素风格 · 无血腥内容 · 全部素材程序生成 · Babylon.js（Apache-2.0）</p>
+    <p class="foot" id="titleEnds"></p>
+    <p class="foot rot">手机请横屏游玩 · 约 30 分钟一局 · 自动存档</p>
+    <p class="foot">体素风格 · 无血腥内容 · 模型/音效全部程序生成 · Babylon.js（Apache-2.0）</p>
   </div>
 </div>
 
-<div id="pause" class="overlay"><div class="card small"><h2>暂停</h2><button id="btnResume" class="primary">继续</button><button id="btnQuit" class="ghostBtn">返回标题</button></div></div>
+<div id="pause" class="overlay"><div class="card small"><h2>暂停</h2>
+  <button id="btnResume" class="primary">继续</button>
+  <button id="btnSave" class="ghostBtn">保存游戏</button>
+  <button id="btnSettings" class="ghostBtn">设置</button>
+  <div id="setBox" class="setBox"></div>
+  <button id="btnQuit" class="ghostBtn">保存并返回标题</button>
+  <p id="pauseMsg" class="foot"></p>
+</div></div>
+
+<div id="setTpl" style="display:none">
+  <label>画质 <select id="setQ"><option value="low">低（流畅）</option><option value="mid">中</option><option value="high">高</option></select></label>
+  <label>音量 <input id="setV" type="range" min="0" max="100"><span id="setVv"></span></label>
+  <label>视角灵敏度 <input id="setS" type="range" min="40" max="250"><span id="setSv"></span></label>
+  <label><input id="setShake" type="checkbox"> 屏幕震动</label>
+</div>
 
 <div id="end" class="overlay"><div class="card small">
-  <h1 id="endTitle">失败</h1><p id="endSub"></p><p id="endStats"></p><div id="endList"></div>
+  <div id="endArt" class="endArt"></div>
+  <h1 id="endTitle">结局</h1><p id="endSub"></p><p id="endStats"></p><div id="endList"></div>
   <button id="btnAgain" class="primary">再来一次</button>
+  <button id="btnTitle" class="ghostBtn">返回标题</button>
 </div></div>
 
 <script>

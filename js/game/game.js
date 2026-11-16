@@ -8,7 +8,7 @@ import { ITEMS, RECIPES, FIST, Inventory, rollLoot, itemName } from './items.js'
 import { NpcManager } from './npcs.js';
 import { BUILDS, BUILD_BY_ID, canPlace, placeStruct, removeStruct, setDoor, setLamp, GEN_RANGE, LAMP_RADIUS, FUEL_HOURS } from './builds.js';
 
-export let HOUR_SEC = 13;            // 1 游戏小时 = 13 秒
+export let HOUR_SEC = 25;            // 1 游戏小时 = 25 秒，72h ≈ 30 分钟
 export const START_CLOCK = 6;        // 第1天 06:00 醒来
 export const EVAC_HOUR = 72;
 export const EVAC = EVAC_POS;
@@ -23,6 +23,7 @@ export const WAVES = [
 ];
 function pickMix(mix) { let r = Math.random(), last = 'walker'; for (const k in mix) { last = k; r -= mix[k]; if (r <= 0) return k; } return last; }
 export const AIRDROPS = [30, 54];
+export const WEATHER = [[7, 12, 'rain'], [30, 34, 'rain'], [37, 46, 'fog'], [50, 57, 'rain'], [61, 70, 'fog']];
 const SLEEP_INPUT = { mx: 0, mz: 0, run: false, jump: false, camYaw: 0, ghostCell: null };
 export const ENDINGS = {
   all: { name: '全员撤离', win: true, title: '结局：全员撤离', text: (g) => `你和${(g.companions || []).join('、')}一起登上了直升机。新曙光市在身后渐渐远去——你们都活下来了。` },
@@ -82,6 +83,8 @@ export class Game {
   }
   emit(e) { this.events.push(e); }
   hourSec() { return HOUR_SEC; }
+  weather() { for (const [a, b, k] of WEATHER) if (this.T >= a && this.T < b) return k; return 'clear'; }
+  weatherSense() { const w = this.weather(); return w === 'fog' ? 5 : w === 'rain' ? 3 : 0; }
   toast(text, short) { this.emit({ type: 'toast', text, short }); }
   clockHour() { return (START_CLOCK + this.T) % 24; }
   day() { return Math.floor((START_CLOCK + this.T) / 24) + 1; }
@@ -130,6 +133,8 @@ export class Game {
     this.focusT -= dt; if (this.focusT <= 0) { this.focusT = 0.12; this.focus = this.findFocus(); }
     if (this.panel && !this.panelValid()) this.closePanel();
     this.updateRegion();
+    const wk = this.weather();
+    if (wk !== this._wk) { if (this._wk !== undefined) this.toast(wk === 'rain' ? '开始下雨了：雨声会掩盖你的动静' : wk === 'fog' ? '浓雾升起：视野变差，感染者也更难发现你' : '天气转晴'); this._wk = wk; }
     this.checkEnd();
   }
   checkEnd() {

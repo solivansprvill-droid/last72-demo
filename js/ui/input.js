@@ -76,6 +76,7 @@ export class Input {
   aimX() { return document.pointerLockElement ? innerWidth / 2 : this.mouse.x; }
   aimY() { return document.pointerLockElement ? innerHeight * 0.55 : this.mouse.y; }
   rotate(dx, dy) {
+    const k = this.sens || 1; dx *= k; dy *= k;
     this.r.camYaw += dx;
     this.r.camPitch = Math.max(-0.15, Math.min(1.2, this.r.camPitch + dy));
   }
