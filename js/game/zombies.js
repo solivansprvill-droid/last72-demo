@@ -82,6 +82,13 @@ export class ZombieManager {
       let mx = 0, mz = 0, speed = T.speed * (zb.slow > 0 ? 0.45 : 1);
       if (zb.state === 'patrol') speed *= 0.55;
       zb.slow = Math.max(0, zb.slow - dt);
+      // 通电照明灯：夜间减速，游荡者会避开光源
+      if (g.litLamps.length) {
+        const l = g.lampAt(zb.x, zb.z);
+        if (l) { speed *= zb.big ? 0.75 : 0.5; zb.inLight = true;
+          if (!zb.wave && zb.state === 'patrol') { const ax = zb.x - l.x - 0.5, az = zb.z - l.z - 0.5, al = Math.hypot(ax, az) || 1; zb.tx = zb.x + ax / al * 5; zb.tz = zb.z + az / al * 5; }
+        } else zb.inLight = false;
+      }
       if (zb.state === 'chase' || zb.state === 'patrol') {
         const tx = zb.tx - zb.x, tz = zb.tz - zb.z, tl = Math.hypot(tx, tz);
         if (tl > 0.05) { mx = tx / tl; mz = tz / tl; }

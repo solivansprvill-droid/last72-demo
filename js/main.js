@@ -18,6 +18,7 @@ const actions = {
   buildType: (i) => game && !paused && game.setBuildType(i),
   eat: () => game && game.eat(),
   drink: () => game && game.drink(),
+  heal: () => game && game.heal(),
   bag: () => $('bag').classList.toggle('open'),
   pause: () => setPause(!paused),
   isBuild: () => game && game.buildMode,
@@ -39,9 +40,11 @@ tapBtn('btnUse', actions.interact);
 tapBtn('btnBuild', actions.build);
 tapBtn('btnBag', actions.bag);
 tapBtn('btnEat', actions.eat); tapBtn('btnDrink', actions.drink);
-tapBtn('btnEat2', actions.eat); tapBtn('btnDrink2', actions.drink);
+tapBtn('btnHeal', actions.heal);
+hud.bind(() => game);
 tapBtn('btnPause', actions.pause);
 document.querySelectorAll('.bbtn').forEach((b) => tapBtn2(b, () => actions.buildType(+b.dataset.i)));
+$('buildBar').addEventListener('pointerdown', (e) => e.stopPropagation());
 function tapBtn2(el, fn) { el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); }
 tapBtn('btnBuildExit', () => game && game.buildMode && game.toggleBuild());
 
@@ -99,6 +102,7 @@ function frame() {
   if (game) {
     for (const e of game.events) {
       renderer.onEvent(e); hud.onEvent(e);
+      if (e.type === 'panel') document.body.classList.toggle('panelOpen', !!e.panel);
       if (e.type === 'end') endScreen(e.win);
       if (e.type === 'hurt' && navigator.vibrate && isTouch) navigator.vibrate(30);
     }

@@ -84,8 +84,15 @@ export class Renderer {
     const arm = new GeoBuilder(); arm.box(-0.1, -0.6, -0.1, 0.1, 0, 0.1, jacket); arm.box(-0.09, -0.72, -0.09, 0.09, -0.6, 0.09, skin);
     this.pArmL = this.meshFrom('pArmL', arm); this.pArmL.parent = P; this.pArmL.position.set(-0.4, 1.36, 0);
     const armR = new GeoBuilder(); armR.box(-0.1, -0.6, -0.1, 0.1, 0, 0.1, jacket); armR.box(-0.09, -0.72, -0.09, 0.09, -0.6, 0.09, skin);
-    armR.box(-0.05, -0.75, -0.05, 0.05, -0.65, 0.9, [0.55, 0.57, 0.6]); armR.box(-0.07, -0.77, 0.55, 0.07, -0.63, 0.95, [0.35, 0.36, 0.38]); // 钢管
     this.pArmR = this.meshFrom('pArmR', armR); this.pArmR.parent = P; this.pArmR.position.set(0.4, 1.36, 0);
+    // 武器模型（挂在右手）
+    const wsg = new GeoBuilder(); wsg.box(-0.05, -0.75, -0.05, 0.05, -0.65, 0.85, [0.5, 0.34, 0.2]); wsg.box(-0.065, -0.765, 0.6, 0.065, -0.635, 0.88, [0.42, 0.28, 0.16]);
+    const wpg = new GeoBuilder(); wpg.box(-0.05, -0.75, -0.05, 0.05, -0.65, 0.95, [0.55, 0.57, 0.6]); wpg.box(-0.07, -0.77, 0.6, 0.07, -0.63, 0.98, [0.35, 0.36, 0.38]);
+    const wag = new GeoBuilder(); wag.box(-0.05, -0.75, -0.05, 0.05, -0.65, 1.0, [0.45, 0.3, 0.18]); wag.box(-0.04, -0.95, 0.72, 0.04, -0.62, 1.02, [0.75, 0.2, 0.15]); wag.box(-0.035, -1.05, 0.74, 0.035, -0.92, 0.98, [0.7, 0.72, 0.75]);
+    this.weapons = { stick: this.meshFrom('wStick', wsg), pipe: this.meshFrom('wPipe', wpg), axe: this.meshFrom('wAxe', wag) };
+    for (const m of Object.values(this.weapons)) { m.parent = this.pArmR; m.setEnabled(false); }
+    this.lampLights = [];
+    for (let i = 0; i < 3; i++) { const L = new BABYLON.PointLight('lamp' + i, new BABYLON.Vector3(0, -50, 0), this.scene); L.diffuse = new BABYLON.Color3(1, 0.9, 0.62); L.specular = new BABYLON.Color3(0, 0, 0); L.range = 10; L.intensity = 0; this.lampLights.push(L); }
 
     // 感染者（风格化体素人形，无血腥）
     const zskin = [0.46, 0.55, 0.45], eye = [0.95, 0.66, 0.2];
@@ -178,8 +185,8 @@ export class Renderer {
     this.effPitch = lerp(this.effPitch ?? this.camPitch, indoor ? Math.min(this.camPitch, 0.12) : this.camPitch, Math.min(1, dt * 4 + (dt === 0 ? 1 : 0)));
     const cp = Math.cos(this.effPitch), sp = Math.sin(this.effPitch);
     const bx = -Math.sin(this.camYaw) * cp, by = sp, bz = -Math.cos(this.camYaw) * cp;
-    let dist = this.camDist;
-    for (let s = 0.4; s <= this.camDist; s += 0.2) {
+    let dist = this.camDist * (p.onTower ? 1.6 : 1);
+    for (let s = 0.4; s <= dist; s += 0.2) {
       const ct = game.world.get(Math.floor(tx + bx * s), Math.floor(ty + by * s), Math.floor(tz + bz * s));
       if (ct !== 0 && ct !== B.LEAF && ct !== B.S_SPIKE) { dist = Math.max(0.6, s - 0.35); break; }
     }
@@ -216,6 +223,11 @@ export class Renderer {
     this.pArmL.rotation.x = moving ? -sw * 0.7 : 0;
     this.pArmR.rotation.x = p.swing > 0 ? -2.2 + (0.3 - p.swing) / 0.3 * 2.6 : (game.buildMode ? -0.9 : (moving ? sw * 0.5 : -0.3));
     P.setEnabled(!p.dead);
+    const eid = game.equip ? game.equip.id : null;
+    for (const k in this.weapons) this.weapons[k].setEnabled(k === eid);
+    // 照明灯点光源（最近的 3 盏）
+    const lit = (game.litLamps || []).slice().sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
+    this.lampLights.forEach((L, i) => { const l = lit[i]; if (l) { L.position.set(l.x + 0.5, l.y + 2.2, l.z + 0.5); L.intensity = 1.1; } else L.intensity = 0; });
 
     // 感染者
     this.updateZombies(game, dt);
@@ -225,8 +237,11 @@ export class Renderer {
     const g = game.ghost;
     if (game.buildMode && g) {
       this.ghost.setEnabled(true);
-      this.ghost.scaling.set(1.02, g.h === 1 ? 0.5 : 2.02, 1.02);
-      this.ghost.position.set(g.x + 0.5, 1 + (g.h === 1 ? 0.25 : 1.01), g.z + 0.5);
+      const cs = g.def.cells; let x0 = 9, x1 = -9, y1 = 0, z0 = 9, z1 = -9;
+      for (const c of cs) { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y1 = Math.max(y1, c[1]); z0 = Math.min(z0, c[2]); z1 = Math.max(z1, c[2]); }
+      const hy = cs.length === 1 && !g.def.block ? 0.5 : y1 + 1.02;
+      this.ghost.scaling.set(x1 - x0 + 1.02, hy, z1 - z0 + 1.02);
+      this.ghost.position.set(g.x + (x0 + x1) / 2 + 0.5, g.y + hy / 2, g.z + (z0 + z1) / 2 + 0.5);
       this.ghostMat.emissiveColor = g.ok ? (g.repair ? new BABYLON.Color3(0.3, 0.7, 1) : new BABYLON.Color3(0.3, 1, 0.4)) : new BABYLON.Color3(1, 0.3, 0.2);
     } else this.ghost.setEnabled(false);
     // 撤离

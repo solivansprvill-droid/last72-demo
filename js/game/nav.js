@@ -17,7 +17,8 @@ export class Nav {
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
       const t1 = w.get(x, 1, z), t2 = w.get(x, 2, z), t3 = w.get(x, 3, z);
       let k = CELL_OPEN;
-      if (t1 === B.S_WALL || t1 === B.S_BAR) k = CELL_STRUCT;
+      const st = w.cellStruct.get(w.idx(x, 1, z));
+      if (st && SOLID[t1] && st.type !== 'box' && st.type !== 'bench' && st.type !== 'gen') k = CELL_STRUCT;
       else if (SOLID[t1]) k = (!SOLID[t2] && !SOLID[t3]) ? CELL_STEP : CELL_BLOCK;
       else if (SOLID[t2]) k = CELL_BLOCK;
       this.kind[x + z * W] = k;
@@ -27,7 +28,7 @@ export class Nav {
   cost(i) {
     const k = this.kind[i];
     if (k === CELL_BLOCK) return INF;
-    if (k === CELL_STRUCT) { const s = this.world.structs.get(i); return s && s.type === 'bar' ? 22 : 14; }
+    if (k === CELL_STRUCT) { const s = this.world.cellStruct.get(i + W * D); return s && (s.type === 'bar' || s.type === 'tower') ? 22 : 14; }
     if (k === CELL_STEP) return 2.5;
     return 1;
   }

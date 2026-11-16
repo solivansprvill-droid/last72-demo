@@ -8,6 +8,10 @@ export const B = {
   WOOD: 15, ROOF: 16, FLOOR: 17, FRIDGE: 18, BED: 19, SOFA: 20, METAL: 21,
   DIRT: 22, LIGHT: 23, BARREL: 24, TIRE: 25, BARRIER: 26, PAD: 27, PADMARK: 28,
   S_WALL: 30, S_BAR: 31, S_SPIKE: 32, BORDER: 33, SHELF: 34, WHEEL: 35,
+  S_DOOR: 36, S_DOOR_O: 37, S_WIN: 38, S_BOX: 39, S_BENCH: 40, S_TOWER: 41, S_PLANK: 42, S_GEN: 43,
+  S_LAMP: 44, S_LAMPON: 45, S_LAMPOFF: 46, WBENCH: 47, RADIO: 48, RADIO_ON: 49, STAIR: 50, TILE: 51,
+  MSHELF: 52, LOCKER: 53, MEDCAB: 54, DESK: 55, SAND: 56, POLICE: 57, HOSP: 58, REDX: 59, SIGN: 60,
+  FUELCAN: 61, CHECKOUT: 62, TENT: 63, MACHINE: 64, BRICK: 65, ACUNIT: 66, FENCE: 67, SIGNB: 68, EMBER: 69,
 };
 
 // 调色板：灰黑 / 暗红 / 冷蓝 / 橙黄
@@ -24,20 +28,30 @@ export const COLORS = {
   [B.PADMARK]: [0.95, 0.66, 0.15], [B.S_WALL]: [0.62, 0.43, 0.24], [B.S_BAR]: [0.45, 0.40, 0.36],
   [B.S_SPIKE]: [0.55, 0.57, 0.60], [B.BORDER]: [0.18, 0.18, 0.20], [B.SHELF]: [0.46, 0.32, 0.20],
   [B.WHEEL]: [0.08, 0.08, 0.09],
+  [B.S_DOOR]: [0.48, 0.30, 0.17], [B.S_DOOR_O]: [0.48, 0.30, 0.17], [B.S_WIN]: [0.55, 0.40, 0.24], [B.S_BOX]: [0.58, 0.42, 0.22],
+  [B.S_BENCH]: [0.52, 0.36, 0.2], [B.S_TOWER]: [0.42, 0.29, 0.17], [B.S_PLANK]: [0.6, 0.44, 0.26], [B.S_GEN]: [0.75, 0.55, 0.12],
+  [B.S_LAMP]: [0.3, 0.31, 0.33], [B.S_LAMPON]: [1.0, 0.92, 0.6], [B.S_LAMPOFF]: [0.35, 0.34, 0.3], [B.WBENCH]: [0.52, 0.36, 0.2],
+  [B.RADIO]: [0.25, 0.32, 0.26], [B.RADIO_ON]: [0.4, 1.0, 0.55], [B.STAIR]: [0.46, 0.45, 0.44], [B.TILE]: [0.70, 0.72, 0.72],
+  [B.MSHELF]: [0.62, 0.64, 0.68], [B.LOCKER]: [0.32, 0.38, 0.46], [B.MEDCAB]: [0.82, 0.86, 0.86], [B.DESK]: [0.42, 0.3, 0.2],
+  [B.SAND]: [0.62, 0.55, 0.38], [B.POLICE]: [0.20, 0.28, 0.44], [B.HOSP]: [0.80, 0.81, 0.80], [B.REDX]: [0.85, 0.2, 0.18],
+  [B.SIGN]: [1.0, 0.6, 0.2], [B.FUELCAN]: [0.78, 0.22, 0.14], [B.CHECKOUT]: [0.3, 0.34, 0.4], [B.TENT]: [0.30, 0.36, 0.24],
+  [B.MACHINE]: [0.36, 0.40, 0.38], [B.BRICK]: [0.46, 0.26, 0.2], [B.ACUNIT]: [0.6, 0.62, 0.6], [B.FENCE]: [0.34, 0.35, 0.36],
+  [B.SIGNB]: [0.45, 0.75, 1.0], [B.EMBER]: [1.0, 0.45, 0.12],
 };
-export const GLOW = new Set([B.LIGHT]);
+export const GLOW = new Set([B.LIGHT, B.S_LAMPON, B.RADIO_ON, B.SIGN, B.SIGNB, B.EMBER]);
 
-export const SOLID = new Uint8Array(64).fill(1);
-SOLID[B.AIR] = 0; SOLID[B.S_SPIKE] = 0;
+export const SOLID = new Uint8Array(128).fill(1);
+SOLID[B.AIR] = 0; SOLID[B.S_SPIKE] = 0; SOLID[B.S_DOOR_O] = 0;
 
-export const STRUCT_TYPES = new Set([B.S_WALL, B.S_BAR, B.S_SPIKE]);
+export const STRUCT_TYPES = new Set([B.S_WALL, B.S_BAR, B.S_SPIKE, B.S_DOOR, B.S_DOOR_O, B.S_WIN, B.S_BOX, B.S_BENCH, B.S_TOWER, B.S_GEN, B.S_LAMP, B.S_LAMPON, B.S_LAMPOFF]);
 
 export class World {
   constructor() {
     this.v = new Uint8Array(W * H * D);
     this.obj = new Int16Array(W * H * D).fill(-1);
     this.objects = [];
-    this.structs = new Map(); // key x+z*W -> {type,x,z,hp,max,h,voxel}
+    this.structs = new Map(); // key structKey(x,y,z) -> struct
+    this.cellStruct = new Map(); // 体素索引 -> struct
     this.dirty = new Set();
     this.version = 0; // 地形变化版本号（导航重算用）
   }
@@ -86,8 +100,8 @@ export class World {
     o.alive = false;
     for (const [x, y, z] of o.cells) if (this.obj[this.idx(x, y, z)] === o.id) this.set(x, y, z, B.AIR, -1);
   }
-  structAt(x, z) { return this.structs.get(x + z * W) || null; }
-  structDamage(x, z) { const s = this.structAt(x, z); return s ? s.hp / s.max : 1; }
+  structAt(x, z, y = 1) { return this.inside(x, y, z) ? this.cellStruct.get(this.idx(x, y, z)) || null : null; }
+  structDamage(x, y, z) { const s = this.cellStruct.get(this.idx(x, y, z)); return s ? Math.max(0, s.hp) / s.max : 1; }
 }
 
 // ---------- 程序化生成：新曙光市住宅街区 ----------
@@ -144,7 +158,7 @@ export function generateWorld(seed = 72) {
     if (edge && !(z === 40 && (x === 46 || x === 47))) for (let y = 1; y <= 3; y++) w.v[w.idx(x, y, z)] = B.WOOD;
     w.v[w.idx(x, 4, z)] = B.ROOF;
   }
-  const shedShelf = w.newObject('shelf', 2, { wood: 2, food: 1 }, '木架');
+  const shedShelf = w.newObject('shelf', 2, 'shelf', '木架');
   w.put(shedShelf, 48, 1, 43, B.SHELF); w.put(shedShelf, 48, 2, 43, B.SHELF);
   const shedCrate = w.newObject('crate', 2, 'crate', '物资箱'); w.put(shedCrate, 45, 1, 43, B.CRATE);
 
@@ -168,11 +182,14 @@ export function generateWorld(seed = 72) {
   const free1 = (x, z) => w.get(x, 1, z) === B.AIR && w.get(x, 2, z) === B.AIR && SOLID[w.get(x, 0, z)];
   const scatter = (n, fn) => { let k = 0, t = 0; while (k < n && t++ < 3000) { const x = ri(r, 2, W - 3), z = ri(r, 2, D - 3); if (!free1(x, z)) continue; if (w.get(x, 0, z) === B.PAD) continue; if (fn(x, z)) k++; } };
   scatter(22, (x, z) => { const o = w.newObject('crate', 2, 'crate', '物资箱'); w.put(o, x, 1, z, B.CRATE); if (r() < 0.3) w.put(o, x, 2, z, B.CRATE); return true; });
-  scatter(12, (x, z) => { if (!free1(x + 1, z) || !free1(x, z + 1)) return false; const o = w.newObject('rubble', 3, { stone: [3, 5], metal: [0, 1] }, '碎石堆'); w.put(o, x, 1, z, B.RUBBLE); w.put(o, x + 1, 1, z, B.RUBBLE); w.put(o, x, 1, z + 1, B.RUBBLE); if (r() < 0.5) w.put(o, x, 2, z, B.RUBBLE); return true; });
-  scatter(8, (x, z) => { const o = w.newObject('barrel', 2, { water: [2, 3] }, '储水桶'); w.put(o, x, 1, z, B.BARREL); return true; });
-  scatter(8, (x, z) => { const o = w.newObject('bin', 2, { metal: [1, 2], food: [0, 1] }, '垃圾箱'); w.put(o, x, 1, z, B.METAL); return true; });
-  scatter(6, (x, z) => { const o = w.newObject('tire', 2, { metal: [1, 1], stone: [1, 2] }, '轮胎堆'); w.put(o, x, 1, z, B.TIRE); return true; });
+  scatter(12, (x, z) => { if (!free1(x + 1, z) || !free1(x, z + 1)) return false; const o = w.newObject('rubble', 3, 'rubble', '碎石堆'); w.put(o, x, 1, z, B.RUBBLE); w.put(o, x + 1, 1, z, B.RUBBLE); w.put(o, x, 1, z + 1, B.RUBBLE); if (r() < 0.5) w.put(o, x, 2, z, B.RUBBLE); return true; });
+  scatter(8, (x, z) => { const o = w.newObject('barrel', 2, 'barrel', '储水桶'); w.put(o, x, 1, z, B.BARREL); return true; });
+  scatter(8, (x, z) => { const o = w.newObject('bin', 2, 'bin', '垃圾箱'); w.put(o, x, 1, z, B.METAL); return true; });
+  scatter(6, (x, z) => { const o = w.newObject('tire', 2, 'tire', '轮胎堆'); w.put(o, x, 1, z, B.TIRE); return true; });
 
+  // 起始公寓里的工作台
+  w.specials = [];
+  const wb = w.newObject('wbench', 99, null, '工作台'); w.put(wb, 6, 1, 12, B.WBENCH); w.specials.push(wb);
   w.version++;
   for (let cx = 0; cx < W / CH; cx++) for (let cz = 0; cz < D / CH; cz++) w.dirty.add(cx + cz * 100);
   return w;
@@ -215,17 +232,17 @@ function building(w, r, x0, z0, x1, z1, doorSide, doorX, height) {
   const step = doorSide === 'N' ? 1 : -1;
   const bed = w.newObject('bed', 99, null, '床');
   for (let x = x0 + 1; x <= x0 + 2; x++) for (let k = 0; k < 3; k++) w.put(null, x, 1, iz + k * step, B.BED);
-  const fr = w.newObject('fridge', 2, { food: [2, 3], water: [1, 2] }, '冰箱');
+  const fr = w.newObject('fridge', 2, 'fridge', '冰箱');
   w.put(fr, mx - 1, 1, iz, B.FRIDGE); w.put(fr, mx - 1, 2, iz, B.FRIDGE);
-  const tb = w.newObject('table', 2, { wood: [2, 3] }, '桌子');
+  const tb = w.newObject('table', 2, 'table', '桌子');
   w.put(tb, x0 + 4, 1, iz + 4 * step, B.WOOD); w.put(tb, x0 + 5, 1, iz + 4 * step, B.WOOD);
-  const sh = w.newObject('shelf', 3, { wood: [2, 3], food: [1, 2], water: [0, 1] }, '储物柜');
+  const sh = w.newObject('shelf', 3, 'shelf', '储物柜');
   for (let y = 1; y <= 3; y++) w.put(sh, mx + 1, y, iz, B.SHELF);
-  const fr2 = w.newObject('fridge', 2, { food: [1, 2], water: [2, 3] }, '冰箱');
+  const fr2 = w.newObject('fridge', 2, 'fridge', '冰箱');
   w.put(fr2, x1 - 1, 1, iz, B.FRIDGE); w.put(fr2, x1 - 1, 2, iz, B.FRIDGE);
   for (let x = mx + 3; x <= mx + 5 && x < x1; x++) w.put(null, x, 1, iz + 3 * step, B.SOFA);
   const cr = w.newObject('crate', 2, 'crate', '物资箱'); w.put(cr, x1 - 2, 1, iz + 5 * step, B.CRATE);
-  const tb2 = w.newObject('table', 2, { wood: [2, 3] }, '桌子');
+  const tb2 = w.newObject('table', 2, 'table', '桌子');
   w.put(tb2, mx + 3, 1, iz + 6 * step, B.WOOD);
   void bed;
 }
@@ -233,7 +250,7 @@ function building(w, r, x0, z0, x1, z1, doorSide, doorX, height) {
 function car(w, r, x, z, dir) {
   const types = [B.CAR_R, B.CAR_B, B.CAR_G];
   const t = types[Math.floor(r() * 3)];
-  const o = w.newObject('car', 6, { metal: [4, 6], stone: [0, 1] }, '废弃汽车');
+  const o = w.newObject('car', 6, 'car', '废弃汽车');
   const L = 4, Wd = 2;
   for (let i = 0; i < L; i++) for (let j = 0; j < Wd; j++) {
     const cx = dir === 'x' ? x + i : x + j, cz = dir === 'x' ? z + j : z + i;
@@ -249,7 +266,7 @@ function lamp(w, x, z) {
 }
 
 function tree(w, r, x, z) {
-  const o = w.newObject('tree', 4, { wood: [5, 7] }, '树');
+  const o = w.newObject('tree', 4, 'tree', '树');
   const h = ri(r, 3, 5);
   for (let y = 1; y <= h; y++) w.put(o, x, y, z, B.TRUNK);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let y = h; y <= h + 2; y++) {

@@ -18,7 +18,8 @@ export class Input {
       if (k === ' ') this.jump = true;
       if (k === 'e') this.a.interact();
       if (k === 'b') this.a.build();
-      if (k === '1' || k === '2' || k === '3') this.a.buildType(+k - 1);
+      if (/^[0-9]$/.test(k)) this.a.buildType(k === '0' ? 9 : +k - 1);
+      if (k === 'h') this.a.heal();
       if (k === 'f') this.a.eat();
       if (k === 'g') this.a.drink();
       if (k === 'tab' || k === 'i') this.a.bag();
@@ -80,7 +81,7 @@ export class Input {
   pickTarget(x, y) { const h = this.r.pick(x, y); return h ? h.block : null; }
   tap(x, y) {
     const h = this.r.pick(x, y);
-    if (this.a.isBuild()) { if (h) this.tapCell = { x: h.cell.x, z: h.cell.z }; return; }
+    if (this.a.isBuild()) { if (h) this.tapCell = { x: h.cell.x, y: h.cell.y, z: h.cell.z }; return; }
     this.a.attack(h ? h.block : null);
   }
   showJoy() {
@@ -109,7 +110,7 @@ export class Input {
       if (this.tapCell) ghostCell = this.tapCell;
       else if (!this.isTouch) {
         this._gT = (this._gT || 0) + 1;
-        if (this._gT % 4 === 0) { const h = this.r.pick(this.aimX(), this.aimY()); this._gc = h ? { x: h.cell.x, z: h.cell.z } : null; }
+        if (this._gT % 4 === 0) { const h = this.r.pick(this.aimX(), this.aimY()); this._gc = h ? { x: h.cell.x, y: h.cell.y, z: h.cell.z } : null; }
         ghostCell = this._gc;
       }
     } else this.tapCell = null;

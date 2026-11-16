@@ -25,9 +25,8 @@
     <div class="stat"><label>饱食</label><div class="bar food"><i id="foodBar"></i></div><button id="btnEat" class="mini">吃</button></div>
     <div class="stat"><label>水分</label><div class="bar water"><i id="waterBar"></i></div><button id="btnDrink" class="mini">喝</button></div>
     <div class="stat"><label>体力</label><div class="bar st"><i id="stBar"></i></div></div>
-    <div id="res">
-      <span class="r wood">木<b id="r_wood">0</b></span><span class="r stone">石<b id="r_stone">0</b></span><span class="r metal">铁<b id="r_metal">0</b></span><span class="r food">食<b id="r_food">0</b></span><span class="r water">水<b id="r_water">0</b></span>
-    </div>
+    <div class="stat"><label>武器</label><span id="weaponTxt">徒手</span><button id="btnHeal" class="mini">疗</button></div>
+    <div id="res"></div>
   </div>
   <button id="btnPause" class="round small">Ⅱ</button>
   <div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
@@ -35,9 +34,14 @@
   <div id="toasts"></div>
   <div id="hint"></div>
   <div id="bag" class="panel">
-    <div class="bagTitle">背包</div>
-    <div id="bagCounts"></div>
-    <div class="bagBtns"><button id="btnEat2">进食（饱食+35）</button><button id="btnDrink2">饮水（水分+40）</button></div>
+    <div class="pTitle"><span>背包 <small id="bagCap"></small></span><button id="btnSort" class="mini">整理</button><button id="btnBagClose" class="mini">✕</button></div>
+    <div id="equipRow"></div>
+    <div id="bagGrid" class="grid"></div>
+    <div id="slotAct"></div>
+  </div>
+  <div id="side" class="panel">
+    <div class="pTitle"><span id="sideTitle">工作台</span><button id="btnSideClose" class="mini">✕</button></div>
+    <div id="sideBody"></div>
   </div>
   <div id="buildBar"></div>
   <button id="btnBuildExit" class="bexit">退出建造</button>
@@ -49,7 +53,7 @@
     <button id="btnBag" class="round">背包</button>
   </div>
   <div id="joyBase"><div id="joyKnob"></div></div>
-  <div id="keysHint">WASD 移动 · Shift 奔跑 · 空格 跳 · 左键 攻击/采集 · 右键拖动/锁定鼠标 转视角 · E 交互/修理 · B 建造(1/2/3) · F 吃 · G 喝 · Tab 背包 · Esc 暂停</div>
+  <div id="keysHint">WASD 移动 · Shift 奔跑 · 空格 跳 · 左键 攻击/采集 · 右键拖动 转视角 · E 交互 · B 建造(1-0) · F 吃 · G 喝 · H 治疗 · Tab 背包 · Esc 暂停</div>
   <div id="vignette"></div>
 </div>
 

@@ -42,13 +42,6 @@ body.playing #hud { display: block; }
 .toast.out { opacity: 0; }
 #hint { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); background: rgba(14,15,19,.78); padding: 3px 10px; font-size: 12px; color: #ffd98a; display: none; white-space: nowrap; }
 
-#bag { position: absolute; right: max(8px, env(safe-area-inset-right)); top: 150px; width: 168px; display: none; pointer-events: auto; font-size: 12px; }
-#bag.open { display: block; }
-.bagTitle { font-weight: 700; color: #f0b54a; margin-bottom: 4px; }
-#bagCounts { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
-#bagCounts div { display: flex; justify-content: space-between; }
-.bagBtns { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-.bagBtns button { background: #3a3b42; color: #fff; border: 1px solid #555; padding: 6px; font-size: 12px; }
 
 #controls { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); width: 190px; height: 190px; display: none; }
 body.touch #controls { display: block; }
@@ -59,15 +52,6 @@ body.touch #controls { display: block; }
 #btnJump { right: 92px; bottom: 0; } #btnUse { right: 0; bottom: 92px; } #btnBuild { right: 72px; bottom: 72px; } #btnBag { right: 134px; bottom: 70px; width: 48px; height: 48px; font-size: 12px; }
 body:not(.touch) #controls { display: none; }
 
-#buildBar { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: 215px; display: none; flex-direction: column; gap: 4px; pointer-events: auto; }
-body.building #buildBar { display: flex; }
-body:not(.touch) #buildBar { bottom: 70px; }
-.bbtn { background: rgba(20,21,26,.8); color: #eee; border: 2px solid #444; padding: 4px 8px; text-align: left; min-width: 104px; }
-.bbtn b { display: block; font-size: 13px; } .bbtn small { font-size: 10px; color: #bbb; }
-.bbtn.sel { border-color: #f0b54a; background: rgba(60,40,10,.85); }
-.bexit { position: absolute; right: max(10px, env(safe-area-inset-right)); display: none; pointer-events: auto; background: #3a3b42; color: #fff; border: 1px solid #666; padding: 4px 8px; font-size: 12px; bottom: 380px; }
-body.building .bexit { display: block; }
-body:not(.touch) .bexit { bottom: 235px; }
 
 #joyBase { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); display: none; }
 #joyKnob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(240,181,74,.55); }
@@ -105,6 +89,42 @@ h2 { margin: 2px 0 10px; font-size: 15px; letter-spacing: 6px; color: #8fc0ea; }
 @media (max-height: 500px) { /* 横屏手机 */
   #controls { transform: scale(.85); transform-origin: bottom right; }
   #banner { top: 6%; } #toasts { top: 20%; } #hint { bottom: 8%; }
-  #bag { top: 8px; right: 190px; }
-  #buildBar { bottom: 175px; flex-direction: row; right: 200px; } .bexit { bottom: 220px; right: 200px; }
+}
+
+/* ---- M2 面板 ---- */
+#weaponTxt { flex: 1; color: #f2d6a0; font-size: 11px; white-space: nowrap; overflow: hidden; }
+.pTitle { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #f0b54a; margin-bottom: 4px; }
+.pTitle span { flex: 1; } .pTitle small { color: #aaa; font-weight: 400; }
+#bag { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; display: none; pointer-events: auto; font-size: 12px; z-index: 5; }
+#bag.open { display: block; }
+body.panelOpen #bag.open { left: auto; right: calc(50% + 6px); transform: translate(0, -50%); }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.grid.g6 { grid-template-columns: repeat(6, 1fr); }
+.slot { height: 40px; background: #23242a; border: 1px solid #3a3b42; border-bottom: 3px solid #555; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; }
+.slot b { font-size: 11px; color: #fff; } .slot span { color: #ddd; }
+.slot.empty { opacity: .35; cursor: default; }
+.slot.sel { outline: 2px solid #f0b54a; }
+#equipRow { margin-bottom: 4px; display: flex; align-items: center; gap: 6px; } #equipRow b { color: #f2d6a0; flex: 1; }
+#slotAct { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-height: 28px; }
+#slotAct .desc { flex-basis: 100%; color: #c9c3b8; }
+#slotAct button, #side button { background: #3a3b42; color: #fff; border: 1px solid #666; padding: 5px 10px; font-size: 12px; }
+#side { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; max-height: 86vh; overflow-y: auto; display: none; pointer-events: auto; font-size: 12px; z-index: 5; }
+#side.open { display: block; }
+body.panelOpen #side.open { left: calc(50% + 6px); transform: translate(0, -50%); }
+.rec { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.rec > div { flex: 1; } .rec b { display: block; color: #f2d6a0; } .rec small { display: block; color: #aaa; font-size: 10px; } .rec small.cost { color: #8fc0ea; }
+.rec.na b { color: #888; } .rec button:disabled { opacity: .4; }
+#side .desc { color: #aaa; margin: 4px 0; } #side .wide { width: 100%; margin-top: 4px; }
+#buildBar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 34px; display: none; gap: 3px; pointer-events: auto; max-width: 92vw; overflow-x: auto; }
+body.building #buildBar { display: flex; }
+body.touch #buildBar { left: 140px; right: 215px; transform: none; bottom: max(8px, env(safe-area-inset-bottom)); max-width: none; }
+.bbtn { background: rgba(20,21,26,.85); color: #eee; border: 2px solid #444; padding: 3px 6px; text-align: left; min-width: 74px; flex: 0 0 auto; }
+.bbtn b { display: block; font-size: 12px; } .bbtn small { font-size: 9px; color: #bbb; }
+.bbtn.sel { border-color: #f0b54a; background: rgba(60,40,10,.9); } .bbtn.na { opacity: .5; }
+.bexit { position: absolute; left: 50%; transform: translateX(-50%); bottom: 90px; display: none; pointer-events: auto; background: #3a3b42; color: #fff; border: 1px solid #666; padding: 4px 8px; font-size: 12px; }
+body.building .bexit { display: block; }
+body.touch .bexit { left: 140px; transform: none; bottom: 64px; }
+@media (max-height: 500px) {
+  #bag, #side { width: 270px; max-height: 92vh; overflow-y: auto; }
+  .slot { height: 32px; }
 }
