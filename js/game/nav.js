@@ -51,6 +51,7 @@ export class Nav {
     while (n > 0 && n < heap.length - 8) {
       const d0 = hk[0]; const i = pop();
       if (d0 > dist[i]) continue;
+      if (d0 > 80) break; // 只计算玩家附近（性能）
       const x = i % W, z = (i / W) | 0;
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dz) continue;

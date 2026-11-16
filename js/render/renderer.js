@@ -150,6 +150,10 @@ export class Renderer {
     const bm = new BABYLON.StandardMaterial('bm', this.scene); bm.disableLighting = true; bm.emissiveColor = new BABYLON.Color3(0.3, 0.75, 1); bm.alpha = 0.12; bm.backFaceCulling = false;
     this.beacon.material = bm; this.beacon.position.set(EVAC.x, 20.5, EVAC.z); this.beacon.isPickable = false; this.beacon.setEnabled(false);
     this.beaconMat = bm;
+    // 任务目标光柱
+    this.objBeam = BABYLON.MeshBuilder.CreateBox('objBeam', { width: 0.7, depth: 0.7, height: 34 }, this.scene);
+    const om = new BABYLON.StandardMaterial('om', this.scene); om.disableLighting = true; om.emissiveColor = new BABYLON.Color3(1, 0.68, 0.2); om.alpha = 0.32; om.backFaceCulling = false;
+    this.objBeam.material = om; this.objBeam.isPickable = false; this.objBeam.setEnabled(false); this.objMat = om;
   }
 
   // ---------- 世界 ----------
@@ -163,12 +167,13 @@ export class Renderer {
       const geo = buildChunk(world, cx, cz);
       let c = this.chunks.get(key);
       if (!c) {
-        c = { solid: new BABYLON.Mesh('c' + key, this.scene), glow: new BABYLON.Mesh('g' + key, this.scene) };
+        c = { solid: new BABYLON.Mesh('c' + key, this.scene), glow: new BABYLON.Mesh('g' + key, this.scene), cx: (cx + 0.5) * CH, cz: (cz + 0.5) * CH };
         c.solid.material = this.mat; c.glow.material = this.glowMat; c.solid.isPickable = true; c.glow.isPickable = false; c.solid._chunk = true;
         this.chunks.set(key, c);
       }
       for (const [m, d] of [[c.solid, geo.solid], [c.glow, geo.glow]]) {
-        if (!d.indices.length) { m.setEnabled(false); continue; }
+        m._empty = !d.indices.length;
+        if (m._empty) { m.setEnabled(false); continue; }
         m.setEnabled(true);
         const vd = new BABYLON.VertexData();
         vd.positions = d.positions; vd.normals = d.normals; vd.colors = d.colors; vd.indices = d.indices;
@@ -193,6 +198,15 @@ export class Renderer {
     const BABYLON = BJ();
     this.syncWorld(game.world);
     const p = game.player;
+    // 区块可见性（按视距流式显示，降低移动端开销）
+    if (((this._cull = (this._cull || 0) + 1) % 8) === 0) {
+      const cpx = this.cam.position.x, cpz = this.cam.position.z, vd = this.viewDist + CH;
+      for (const c of this.chunks.values()) {
+        const vis = Math.abs(c.cx - cpx) < vd && Math.abs(c.cz - cpz) < vd;
+        if (c.solid._empty !== true) c.solid.setEnabled(vis);
+        if (c.glow._empty !== true) c.glow.setEnabled(vis);
+      }
+    }
     // 相机
     const tx = p.x, ty = p.y + 1.75, tz = p.z;
     const fx0 = Math.floor(p.x), fz0 = Math.floor(p.z), fy0 = Math.floor(p.y);
@@ -273,6 +287,9 @@ export class Renderer {
       this.rotor.rotation.y += dt * 25;
     }
     this.beacon.setEnabled(game.evacActive);
+    const ob = game.objective && game.state === 'play' ? game.objective() : null;
+    if (ob && Math.hypot(ob.x - p.x, ob.z - p.z) > 5 && !game.evacActive) { this.objBeam.setEnabled(true); this.objBeam.position.set(ob.x, 17, ob.z); this.objMat.alpha = 0.22 + Math.sin(t * 2.5) * 0.08; }
+    else this.objBeam.setEnabled(false);
     if (game.evacActive) this.beaconMat.alpha = 0.1 + Math.sin(t * 3) * 0.05;
     this.scene.render();
   }

@@ -14,9 +14,12 @@
 
 <!-- HUD -->
 <div id="hud">
+  <canvas id="minimap" width="132" height="132"></canvas>
+  <div id="bigmap"><canvas id="bigmapC" width="300" height="600"></canvas><p>点击任意处关闭 · 橙点=目标 · 红点=感染者 · 绿点=幸存者</p></div>
   <div id="tl" class="panel">
     <div id="clock">第1天 06:00</div>
     <div id="survived">已存活 0h / 72h</div>
+    <div id="regionTxt"></div>
     <div id="waveInfo"></div>
     <div id="missionBox"><span class="tag">任务</span><span id="mission"></span></div>
   </div>

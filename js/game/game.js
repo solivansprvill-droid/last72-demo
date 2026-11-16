@@ -1,5 +1,6 @@
 // 游戏核心逻辑（与渲染完全分离，便于移植到 造化 / Babylon 模板）
-import { World, generateWorld, W, D, B } from './voxels.js';
+import { World, W, D, B } from './voxels.js';
+import { generateWorld, REGIONS, regionAt, START, EVAC_POS, STREETS, AVE } from './worldgen.js';
 import { moveEntity, collides } from './physics.js';
 import { Nav } from './nav.js';
 import { ZombieManager, MAX_Z, ZTYPES, EXPLODE } from './zombies.js';
@@ -8,8 +9,9 @@ import { BUILDS, BUILD_BY_ID, canPlace, placeStruct, removeStruct, setDoor, setL
 
 export let HOUR_SEC = 13;            // 1 游戏小时 = 13 秒
 export const START_CLOCK = 6;        // 第1天 06:00 醒来
-export const EVAC_HOUR = 72, EVAC_LEAVE = 77;
-export const EVAC = { x: 31.5, z: 57.5, r: 4.5 };
+export const EVAC_HOUR = 72;
+export const EVAC = EVAC_POS;
+export { REGIONS };
 export { BUILDS };
 export const RES_NAMES = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, v.name]));
 
@@ -23,12 +25,15 @@ export const AIRDROPS = [30, 54];
 
 export const MISSIONS = [
   { id: 'wake', text: '醒来：走动一下，熟悉操作' },
-  { id: 'supply', text: '找水和食物：食物×2、净水×2（冰箱/物资箱）' },
+  { id: 'supply', text: '找水和食物：食物×2、水×2（冰箱/物资箱）' },
   { id: 'wood', text: '收集木材：木材×12（砍树、拆家具）' },
   { id: 'base', text: '建立基地：放置 4 个工事（按 建造）' },
-  { id: 'wave1', text: '抵御第一次尸潮（约 18h 夜间来袭）' },
-  { id: 'hold', text: '坚守：活到第 72 小时' },
-  { id: 'evac', text: '撤离：前往北部撤离点！' },
+  { id: 'wave1', text: '抵御第一次尸潮（第1天 24:00 来袭）' },
+  { id: 'mart', text: '超市补给：搜刮大型超市的货架×4', target: { x: 57, z: 64.5, name: '大型超市' } },
+  { id: 'police', text: '警察局：找到通讯设备（后方装备室）', target: { x: 10.5, z: 115, name: '警察局装备室' } },
+  { id: 'hosp', text: '中心医院：寻找医生和急救药品（楼上）', target: { x: 74.5, z: 140, name: '中心医院' } },
+  { id: 'radio', text: '修复电台：带通讯设备+电子零件×2 回公寓 3 楼', target: { x: 21.5, z: 8.5, name: '公寓 3 楼电台' } },
+  { id: 'evac', text: '坚守到第 72 小时，前往北部撤离区', target: { x: EVAC_POS.x, z: EVAC_POS.z, name: '北部撤离区' } },
 ];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -42,7 +47,7 @@ export class Game {
     this.zm = new ZombieManager(this);
     this.events = [];
     this.player = {
-      x: 8.5, y: 1, z: 8.5, vy: 0, hw: 0.3, h: 1.75, onGround: false, canStep: true, yaw: 0,
+      x: START.x, y: START.y, z: START.z, vy: 0, hw: 0.3, h: 1.75, onGround: false, canStep: true, yaw: 0,
       hp: 100, hunger: 80, thirst: 70, stamina: 100, dead: false, atkCd: 0, swing: 0, walk: 0,
       moved: 0, hurtT: 0, running: false,
     };
@@ -60,6 +65,8 @@ export class Game {
     this.focus = null; this.focusT = 0;
     this.litLamps = [];
     this.lampT = 0;
+    this.radioFixed = false; this.martLoot = 0; this.region = 'apt'; this.visited = { apt: true };
+    this.evacLeave = 75;
     if (opts.hourSec) HOUR_SEC = opts.hourSec;
   }
   emit(e) { this.events.push(e); }
@@ -104,7 +111,8 @@ export class Game {
     if (this.panel && !this.panelValid()) this.closePanel();
     if (p.hp <= 0 && !p.dead) { p.dead = true; this.state = 'lose'; this.emit({ type: 'end', win: false }); }
     if (this.evacActive && Math.hypot(p.x - EVAC.x, p.z - EVAC.z) < EVAC.r) { this.state = 'win'; this.emit({ type: 'end', win: true }); }
-    if (this.T >= EVAC_LEAVE && this.state === 'play') { this.state = 'lose'; this.loseReason = '撤离直升机已经离开'; this.emit({ type: 'end', win: false }); }
+    this.updateRegion();
+    if (this.T >= this.evacLeave && this.state === 'play') { this.state = 'lose'; this.loseReason = '撤离直升机已经离开'; this.emit({ type: 'end', win: false }); }
   }
 
   updatePlayer(dt, inp) {
@@ -135,7 +143,7 @@ export class Game {
     p.moved += md; p.walk += md;
     p.atkCd = Math.max(0, p.atkCd - dt);
     p.swing = Math.max(0, p.swing - dt);
-    if (p.y < -5) { p.y = 3; p.x = 8.5; p.z = 8.5; }
+    if (p.y < -5) { p.y = 3; p.x = START.x; p.z = START.z; }
     if (p.onTower && (Math.hypot(p.x - p.onTower.x - 0.5, p.z - p.onTower.z - 0.5) > 1.9 || p.y < p.onTower.y + 3.5 || p.onTower.hp <= 0)) p.onTower = null;
   }
 
@@ -214,6 +222,7 @@ export class Game {
     this.world.removeObject(o);
     const got = this.give(o.rolled);
     this.harvested = (this.harvested || 0) + 1;
+    if (o.kind === 'mshelf') this.martLoot++;
     this.onHarvest(o);
     this.emit({ type: 'break', blocks });
     this.toast(`${o.name}：${got.join('  ') || '空的'}`);
@@ -254,6 +263,10 @@ export class Game {
       if (d > 2.4 || Math.abs(c[1] - p.y) > 2.5) continue;
       const score = d + facing(c[0] + 0.5, c[2] + 0.5) * 0.8;
       if (o.kind === 'wbench') consider(score, { kind: 'bench', o, label: '使用工作台' });
+      else if (o.kind === 'radio') consider(score, { kind: 'radio', o, label: this.radioFixed ? '电台：已联系军方' : '修复电台（通讯设备 + 电子零件×2）' });
+      else if (o.kind === 'commsbox') consider(score, { kind: 'commsbox', o, label: o.taken ? '装备柜（已搜空）' : '打开装备柜' });
+      else if (o.kind === 'medkit') consider(score, { kind: 'medkit', o, label: o.taken ? '药品柜（已搜空）' : '打开急救药品柜' });
+      else if (o.kind === 'sleepbed' && this.sleepLabel) consider(score + 0.3, { kind: 'sleep', o, label: this.sleepLabel() });
     }
   }
   interact() {
@@ -288,7 +301,105 @@ export class Game {
       default: this.doExtra(f);
     }
   }
-  doExtra() {}
+  doExtra(f) {
+    const o = f.o;
+    if (f.kind === 'radio') {
+      if (this.radioFixed) { this.toast('电台：军方确认第 72 小时在北部撤离区接应'); return; }
+      if (!this.inv.count('comms') || this.inv.count('parts') < 2) { this.toast('电台损坏：需要 通讯设备 + 电子零件×2'); return; }
+      this.inv.remove('comms', 1); this.inv.remove('parts', 2); this.radioFixed = true; this.evacLeave = 78;
+      const c = o.cells[0]; this.world.set(c[0], c[1], c[2], B.RADIO_ON); o.cells.length = 0; o.cells.push(c); this.world.obj[this.world.idx(c[0], c[1], c[2])] = o.id;
+      this.emit({ type: 'banner', text: '联系上军方了！', sub: '直升机将于第 72 小时降落在北部撤离区，停留到第 78 小时', kind: 'ok' });
+      this.emit({ type: 'radio' });
+    } else if (f.kind === 'commsbox' || f.kind === 'medkit') {
+      if (o.taken) { this.toast('里面已经空了', true); return; }
+      const loot = f.kind === 'commsbox' ? { comms: 1, parts: 2, bandage: 1 } : { medkit: 1, medicine: 2, bandage: 2 };
+      if (!this.inv.canFit(loot)) { this.toast('背包已满！'); return; }
+      o.taken = true; const got = this.give(loot);
+      this.toast(`${o.name}：${got.join('  ')}`);
+      this.emit({ type: 'questItem', id: f.kind });
+    } else if (f.kind === 'sleep' && this.sleep) this.sleep();
+  }
+  // ---------- 区域 ----------
+  updateRegion() {
+    const p = this.player, rg = regionAt(p.z);
+    if (rg.id === this.region) return;
+    this.region = rg.id;
+    if (!this.visited[rg.id]) {
+      this.visited[rg.id] = true;
+      this.emit({ type: 'banner', text: `进入：${rg.name}`, sub: { mart: '货架上可能还有食物和水', police: '装备室里也许有通讯设备', hosp: '小心楼上……', evac: '撤离直升机会在这里降落' }[rg.id] || '', kind: 'ok' });
+      this.populate(rg);
+    } else this.toast(`进入 ${rg.name}`, true);
+  }
+  buildingAt(x, z) { for (const b of this.world.buildings || []) if (x >= b.x0 && x < b.x1 + 1 && z >= b.z0 && z < b.z1 + 1) return b; return null; }
+  freeCellIn(b, y, tries = 40) {
+    for (let i = 0; i < tries; i++) {
+      const x = b.x0 + 1 + Math.floor(Math.random() * (b.x1 - b.x0 - 1)), z = b.z0 + 1 + Math.floor(Math.random() * (b.z1 - b.z0 - 1));
+      if (!this.world.solid(x, y, z) && !this.world.solid(x, y + 1, z) && this.world.solid(x, y - 1, z) && Math.hypot(x - this.player.x, z - this.player.z) > 8) return [x + 0.5, z + 0.5];
+    }
+    return null;
+  }
+  // 首次进入区域：建筑内的感染者
+  populate(rg) {
+    const n = { mart: 6, police: 5, hosp: 8, evac: 4 }[rg.id] || 0;
+    const bs = (this.world.buildings || []).filter(b => regionAt((b.z0 + b.z1) / 2).id === rg.id);
+    for (let i = 0; i < n && this.zm.alive < MAX_Z - 4; i++) {
+      const b = bs[i % Math.max(1, bs.length)]; if (!b) break;
+      const fl = Math.floor(Math.random() * b.floors), y = fl * b.fh + 1;
+      const c = this.freeCellIn(b, y); if (!c) continue;
+      this.zm.spawn(this.ambientType(), c[0], c[1], 0, y);
+    }
+  }
+  // 感染者上楼：每栋楼每层预计算到楼梯口的距离场
+  stairField(b, f) {
+    const key = f, w = this.world;
+    b.fields = b.fields || {};
+    let F = b.fields[key];
+    if (F && F.ver === w.version) return F;
+    if (F && this.time - F.t < 2) return F;
+    const bw = b.x1 - b.x0 + 1, bd = b.z1 - b.z0 + 1, y = f * b.fh + 1;
+    const dist = new Int16Array(bw * bd).fill(-1);
+    const { sx, sz } = b.stairs, A = f % 2 === 0, lane = A ? sz : sz + 2;
+    const ex = (A ? sx - 1 : sx + b.fh) - b.x0;
+    const q = [];
+    for (const ez of [lane - b.z0, lane + 1 - b.z0]) { dist[ex + ez * bw] = 0; q.push(ex + ez * bw); }
+    const open = (x, z) => !w.solid(b.x0 + x, y, b.z0 + z) && !w.solid(b.x0 + x, y + 1, b.z0 + z);
+    for (let qi = 0; qi < q.length; qi++) {
+      const i = q[qi], x = i % bw, z = (i / bw) | 0;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, nz = z + dz; if (nx < 0 || nz < 0 || nx >= bw || nz >= bd) continue;
+        const j = nx + nz * bw; if (dist[j] >= 0 || !open(nx, nz)) continue;
+        dist[j] = dist[i] + 1; q.push(j);
+      }
+    }
+    F = { dist, bw, bd, ver: w.version, t: this.time };
+    b.fields[key] = F; return F;
+  }
+  stairPath(zb, p) {
+    const b = this.buildingAt(p.x, p.z); if (!b || !b.stairs) return null;
+    if (!(zb.x >= b.x0 && zb.x < b.x1 + 1 && zb.z >= b.z0 && zb.z < b.z1 + 1)) return null;
+    const fp = Math.floor((p.y - 0.5) / b.fh), fz = Math.floor((zb.y - 0.5) / b.fh);
+    if (fz >= fp || fz >= b.floors - 1) return null;
+    const { sx, sz } = b.stairs, fh = b.fh, A = fz % 2 === 0, lane = A ? sz : sz + 2;
+    const exit = A ? { x: sx + fh + 0.6, z: lane + 1 } : { x: sx - 0.6, z: lane + 1 };
+    const onLane = zb.z >= lane - 0.1 && zb.z <= lane + 2.1 && zb.x >= sx - 1 && zb.x <= sx + fh + 1;
+    if (onLane) return exit;
+    const F = this.stairField(b, fz);
+    const cx = Math.floor(zb.x) - b.x0, cz = Math.floor(zb.z) - b.z0;
+    let best = cx >= 0 && cz >= 0 && cx < F.bw && cz < F.bd ? F.dist[cx + cz * F.bw] : -1, bx = cx, bz = cz;
+    if (best === 0) return { x: (A ? sx - 0.2 : sx + fh + 0.2), z: lane + 1 };
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const nx = cx + dx, nz = cz + dz; if (nx < 0 || nz < 0 || nx >= F.bw || nz >= F.bd) continue;
+      const v = F.dist[nx + nz * F.bw]; if (v < 0) continue;
+      if (dx && dz && (F.dist[cx + dx + cz * F.bw] < 0 || F.dist[cx + (cz + dz) * F.bw] < 0)) continue;
+      if (best < 0 || v < best) { best = v; bx = nx; bz = nz; }
+    }
+    return { x: b.x0 + bx + 0.5, z: b.z0 + bz + 0.5 };
+  }
+  objective() {
+    const m = MISSIONS[this.mission];
+    if (this.evacActive || this.T > EVAC_HOUR - 4) return { x: EVAC.x, z: EVAC.z, name: this.evacActive ? '北部撤离点' : `撤离点 ${Math.max(0, Math.ceil(EVAC_HOUR - this.T))}h 后开放` };
+    return m && m.target ? m.target : null;
+  }
   openPanel(pn) { this.panel = pn; if (this.buildMode) this.toggleBuild(); this.emit({ type: 'panel', panel: pn.kind }); }
   closePanel() { this.panel = null; this.emit({ type: 'panel', panel: null }); }
   panelValid() {
@@ -487,19 +598,18 @@ export class Game {
   }
 
   // ---------- 时间 / 尸潮 / 刷怪 ----------
-  spawnPoint(far = 20) {
+  spawnPoint(far = 22) {
     const p = this.player;
-    const pts = [[2.5, 30.5], [2.5, 33.5], [61.5, 30.5], [61.5, 33.5], [31.5, 1.5], [32.5, 2.5]];
-    const cand = pts.filter(([x, z]) => Math.hypot(x - p.x, z - p.z) > far);
-    if (Math.random() < 0.5) {
-      for (let i = 0; i < 20; i++) {
-        const x = 2 + Math.floor(Math.random() * (W - 4)), z = 2 + Math.floor(Math.random() * (D - 14));
-        const t0 = this.world.get(x, 0, z);
-        if ((t0 === B.GRASS || t0 === B.ROAD || t0 === B.DIRT) && this.nav.isOpen(x, z) && Math.hypot(x - p.x, z - p.z) > far) return [x + 0.5, z + 0.5];
-      }
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2, d = far + Math.random() * 14;
+      const x = Math.floor(p.x + Math.sin(a) * d), z = Math.floor(p.z + Math.cos(a) * d);
+      if (x < 2 || z < 2 || x > W - 3 || z > D - 3) continue;
+      if (this.nav.isOpen(x, z) && !this.world.solid(x, 1, z) && !this.world.solid(x, 2, z) && !this.buildingAt(x, z)) return [x + 0.5, z + 0.5];
     }
-    const list = cand.length ? cand : pts;
-    return list[Math.floor(Math.random() * list.length)];
+    // 退回：附近街道两端
+    let best = null, bd = 1e9;
+    for (const z0 of STREETS) for (const x of [2.5, W - 2.5]) { const d = Math.abs(Math.hypot(x - p.x, z0 + 2.5 - p.z) - far - 8); if (d < bd) { bd = d; best = [x, z0 + 2.5]; } }
+    return best;
   }
   director(dt) {
     const T = this.T;
@@ -513,7 +623,7 @@ export class Game {
       this.waveSpawnT -= dt;
       if (aw.spawned < aw.count && this.waveSpawnT <= 0 && this.zm.alive < MAX_Z) {
         this.waveSpawnT = 1.2;
-        const [x, z] = this.spawnPoint(18);
+        const [x, z] = this.spawnPoint(24);
         const zb = this.zm.spawn(pickMix(aw.mix), x + Math.random() - 0.5, z + Math.random() - 0.5, aw.idx + 1);
         if (zb) aw.spawned++;
       }
@@ -534,7 +644,7 @@ export class Game {
     if (this.spawnT <= 0) {
       this.spawnT = 2.5;
       const d = this.day();
-      const target = this.isNight() ? 8 + d * 3 : 4 + d * 2;
+      const target = Math.round((this.isNight() ? 8 + d * 3 : 4 + d * 2) * regionAt(this.player.z).density);
       const ambient = this.zm.list.filter(z => !z.wave).length;
       if (ambient < target && this.zm.alive < MAX_Z - 2 && this.T > 0.6) {
         const [x, z] = this.spawnPoint(22);
@@ -544,11 +654,11 @@ export class Game {
     if (this.airdropIdx < AIRDROPS.length && T >= AIRDROPS[this.airdropIdx]) {
       this.airdropIdx++;
       const n = this.dropSupplies();
-      this.emit({ type: 'banner', text: '空投补给已投放到主路！', sub: `${n} 个物资箱落在路面上`, kind: 'ok' });
+      this.emit({ type: 'banner', text: '空投补给已投放到附近主路！', sub: `${n} 个物资箱落在南北主干道上`, kind: 'ok' });
     }
     if (!this.evacActive && T >= EVAC_HOUR) {
       this.evacActive = true;
-      this.emit({ type: 'banner', text: '撤离直升机已抵达北部撤离点！', sub: '直升机只会停留 5 小时，快跑！', kind: 'evac' });
+      this.emit({ type: 'banner', text: '撤离直升机已抵达北部撤离区！', sub: `直升机将停留到第 ${this.evacLeave} 小时，快去！`, kind: 'evac' });
       this.emit({ type: 'evac' });
     }
   }
@@ -559,9 +669,9 @@ export class Game {
     return Math.random() < (n ? 0.3 : 0.12) * d ? 'runner' : 'walker';
   }
   dropSupplies() {
-    let n = 0;
-    for (let i = 0; i < 40 && n < 6; i++) {
-      const x = 6 + Math.floor(Math.random() * 52), z = 29 + Math.floor(Math.random() * 6);
+    let n = 0; const pz = Math.max(8, Math.min(D - 30, this.player.z));
+    for (let i = 0; i < 60 && n < 6; i++) {
+      const x = AVE.x0 + 1 + Math.floor(Math.random() * 8), z = Math.floor(pz - 14 + Math.random() * 28);
       if (this.world.get(x, 1, z) !== B.AIR || this.world.structAt(x, z)) continue;
       const o = this.world.newObject('airdrop', 2, 'airdrop', '空投箱');
       this.world.put(o, x, 1, z, B.CRATE); n++;
@@ -569,20 +679,27 @@ export class Game {
     }
     return n;
   }
-  updateMission() {
-    const m = MISSIONS[this.mission]; if (!m) return;
+  missionDone(m) {
     const inv = this.inv, p = this.player;
-    let done = false;
     switch (m.id) {
-      case 'wake': done = p.moved > 4; break;
-      case 'supply': done = (inv.count('food') + inv.count('can') >= 2 && inv.count('water') + inv.count('dirty') >= 2) || this.T > 14; break;
-      case 'wood': done = inv.count('wood') >= 12 || this.placed >= 3 || this.T > 15; break;
-      case 'base': done = this.placed >= 4 || this.T > 18; break;
-      case 'wave1': done = this.wave1Cleared; break;
-      case 'hold': done = this.evacActive; break;
-      default: break;
+      case 'wake': return p.moved > 4;
+      case 'supply': return (inv.count('food') + inv.count('can') >= 2 && inv.count('water') + inv.count('dirty') >= 2) || this.T > 14;
+      case 'wood': return inv.count('wood') >= 12 || this.placed >= 3 || this.T > 15;
+      case 'base': return this.placed >= 4 || this.T > 18;
+      case 'wave1': return this.wave1Cleared;
+      case 'mart': return this.martLoot >= 4;
+      case 'police': return inv.count('comms') > 0 || this.radioFixed;
+      case 'hosp': return inv.count('medkit') > 0 || (this.npcs && this.npcs.get('doctor').joined) || this.medkitGiven;
+      case 'radio': return this.radioFixed;
+      default: return false;
     }
-    if (done) { this.mission++; const nm = MISSIONS[this.mission]; if (nm) this.emit({ type: 'mission', text: nm.text }); }
+  }
+  updateMission() {
+    for (let guard = 0; guard < 3; guard++) {
+      const m = MISSIONS[this.mission]; if (!m || !this.missionDone(m)) return;
+      this.mission++; const nm = MISSIONS[this.mission];
+      if (nm) this.emit({ type: 'mission', text: nm.text });
+    }
   }
   survivedHours() { return Math.floor(this.T); }
   structureHint() { return this.focus ? this.focus.label : null; }

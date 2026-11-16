@@ -68,7 +68,7 @@ export class ZombieManager {
       if (zb.ai <= 0) { // 分帧决策
         zb.ai = 0.22 + Math.random() * 0.1;
         const sense = (g.isNight() ? 20 : 13) + (zb.state === 'investigate' ? 4 : 0) - (p.sneak ? 5 : 0);
-        const upstairs = p.y > 4.5 && zb.y < 3 && !p.onTower;
+        const upstairs = p.y - zb.y > 1.2 && !p.onTower;
         const chase = !p.dead && (zb.wave || pd < sense || zb.state === 'chase' && pd < sense + 8);
         if (zb.state === 'attackBuilding' && zb.target && zb.target.hp > 0 && d > 2) {
           // 继续拆
@@ -79,7 +79,7 @@ export class ZombieManager {
             zb.state = 'chase';
             const stair = upstairs && g.stairPath ? g.stairPath(zb, p) : null;
             if (stair) { zb.tx = stair.x; zb.tz = stair.z; }
-            else if (d < 2.6 && dyp < 1.5) { zb.tx = tg.x; zb.tz = tg.z; }
+            else if ((d < 2.6 && dyp < 1.5) || (zb.y > 3 && dyp < 3)) { zb.tx = tg.x; zb.tz = tg.z; }
             else {
               const n = nav.next(zb.x, zb.z);
               if (n) {

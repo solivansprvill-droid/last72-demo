@@ -3,6 +3,8 @@ import { Game } from './game/game.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
+import { Minimap } from './ui/minimap.js';
+import { regionAt } from './game/worldgen.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -11,6 +13,9 @@ document.body.classList.toggle('touch', isTouch);
 let game = null, paused = false, running = false, last = performance.now();
 const renderer = new Renderer($('game'), { mobile: isTouch });
 const hud = new Hud();
+const minimap = new Minimap($('minimap'), $('bigmapC'));
+$('minimap').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); minimap.open = true; $('bigmap').classList.add('show'); });
+$('bigmap').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); minimap.open = false; $('bigmap').classList.remove('show'); });
 const actions = {
   attack: (t) => game && !paused && game.attack(t),
   interact: () => game && !paused && game.interact(),
@@ -21,6 +26,7 @@ const actions = {
   heal: () => game && game.heal(),
   bag: () => $('bag').classList.toggle('open'),
   pause: () => setPause(!paused),
+  map: () => { minimap.open = !minimap.open; $('bigmap').classList.toggle('show', minimap.open); },
   isBuild: () => game && game.buildMode,
 };
 const input = new Input($('game'), actions, renderer);
@@ -108,7 +114,7 @@ function frame() {
     }
     game.events.length = 0;
     renderer.render(game, running && !paused ? dt : 0);
-    if (running) hud.update(game, dt, renderer);
+    if (running) { hud.update(game, dt, renderer); minimap.update(game, dt, renderer.camYaw); $('regionTxt').textContent = '区域：' + regionAt(game.player.z).name; }
   } else {
     renderer.scene.render();
   }
@@ -118,12 +124,12 @@ function frame() {
 // 标题画面背景：先生成一个世界缓慢环绕
 game = new Game(); window.__game = game;
 renderer.syncWorld(game.world, 99);
-game.player.x = 31; game.player.z = 31; game.T = 11; game.player.dead = true;
+game.player.x = 47; game.player.z = 36; game.player.y = 2; game.T = 11; game.player.dead = true;
 let titleSpin = 0;
-renderer.camDist = 26; renderer.camPitch = 0.5;
+renderer.camDist = 30; renderer.camPitch = 0.45;
 const origRender = renderer.render.bind(renderer);
 renderer.render = (g, dt) => {
-  if (!running) { titleSpin += 0.0015; renderer.camYaw = titleSpin; renderer.camDist = 26; }
+  if (!running) { titleSpin += 0.0015; renderer.camYaw = titleSpin; renderer.camDist = 30; }
   else renderer.camDist = isTouch ? 7.5 : 6.5;
   origRender(g, dt);
 };

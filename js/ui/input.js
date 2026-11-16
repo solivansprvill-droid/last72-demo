@@ -23,6 +23,7 @@ export class Input {
       if (k === 'f') this.a.eat();
       if (k === 'g') this.a.drink();
       if (k === 'tab' || k === 'i') this.a.bag();
+      if (k === 'm') this.a.map && this.a.map();
       if (k === 'escape' || k === 'p') this.a.pause();
       if (k === 'j' || k === 'enter') this.a.attack(null);
     });
