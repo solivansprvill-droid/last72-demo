@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111216">
+<title>方块末日：最后72小时 · LAST 72 HOURS（试玩版）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="loading"><div class="spin"></div><p>正在加载引擎…（首次约 2–9 MB）</p></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="tl" class="panel">
+    <div id="clock">第1天 06:00</div>
+    <div id="survived">已存活 0h / 72h</div>
+    <div id="waveInfo"></div>
+    <div id="missionBox"><span class="tag">任务</span><span id="mission"></span></div>
+  </div>
+  <div id="tr" class="panel">
+    <div class="stat"><label>生命</label><div class="bar hp"><i id="hpBar"></i></div></div>
+    <div class="stat"><label>饱食</label><div class="bar food"><i id="foodBar"></i></div><button id="btnEat" class="mini">吃</button></div>
+    <div class="stat"><label>水分</label><div class="bar water"><i id="waterBar"></i></div><button id="btnDrink" class="mini">喝</button></div>
+    <div class="stat"><label>体力</label><div class="bar st"><i id="stBar"></i></div></div>
+    <div id="res">
+      <span class="r wood">木<b id="r_wood">0</b></span><span class="r stone">石<b id="r_stone">0</b></span><span class="r metal">铁<b id="r_metal">0</b></span><span class="r food">食<b id="r_food">0</b></span><span class="r water">水<b id="r_water">0</b></span>
+    </div>
+  </div>
+  <button id="btnPause" class="round small">Ⅱ</button>
+  <div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
+  <div id="evac"><span id="evacArrow">▲</span><span id="evacText"></span></div>
+  <div id="toasts"></div>
+  <div id="hint"></div>
+  <div id="bag" class="panel">
+    <div class="bagTitle">背包</div>
+    <div id="bagCounts"></div>
+    <div class="bagBtns"><button id="btnEat2">进食（饱食+35）</button><button id="btnDrink2">饮水（水分+40）</button></div>
+  </div>
+  <div id="buildBar"></div>
+  <button id="btnBuildExit" class="bexit">退出建造</button>
+  <div id="controls">
+    <button id="btnAttack" class="round big">攻击</button>
+    <button id="btnJump" class="round">跳跃</button>
+    <button id="btnUse" class="round">交互</button>
+    <button id="btnBuild" class="round">建造</button>
+    <button id="btnBag" class="round">背包</button>
+  </div>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="keysHint">WASD 移动 · Shift 奔跑 · 空格 跳 · 左键 攻击/采集 · 右键拖动/锁定鼠标 转视角 · E 交互/修理 · B 建造(1/2/3) · F 吃 · G 喝 · Tab 背包 · Esc 暂停</div>
+  <div id="vignette"></div>
+</div>
+
+<!-- 标题 -->
+<div id="title" class="overlay">
+  <div class="card">
+    <div class="tags"><span class="orig">原创作品</span><span class="trial">试玩版</span></div>
+    <h1>方块末日<span>：最后72小时</span></h1>
+    <h2>LAST 72 HOURS</h2>
+    <p class="lead">新曙光市沦陷。收集物资、建造防线、熬过三夜尸潮，<br>在第 72 小时登上北部撤离点的直升机。</p>
+    <button id="btnStart" class="primary">开始游戏</button>
+    <button id="btnHelp" class="ghostBtn">操作说明</button>
+    <div id="help">
+      <div class="col"><h3>手机</h3>
+        <p>左下拖动：移动（推到底奔跑）</p><p>右侧拖动：旋转视角</p><p>点按物体：采集 / 攻击</p>
+        <p>按钮：攻击 · 跳跃 · 交互(修理) · 建造 · 背包</p><p>建造模式：点地面选位置，按“放置”</p></div>
+      <div class="col"><h3>电脑</h3>
+        <p>WASD 移动 · Shift 奔跑 · 空格 跳</p><p>鼠标左键：攻击 / 采集（首次点击锁定鼠标）</p>
+        <p>E 交互/修理 · B 建造 · 1/2/3 选木墙/路障/尖刺</p><p>F 吃 · G 喝 · Tab 背包 · Esc 暂停</p></div>
+      <p class="tip">木墙=木4　路障=木3+铁2　尖刺陷阱=铁2+石2　·　对已受损的工事再次放置或按交互可修理</p>
+    </div>
+    <p class="foot rot">手机建议横屏游玩，竖屏也可操作</p>
+    <p class="foot">体素风格 · 无血腥内容 · 全部素材程序生成 · Babylon.js（Apache-2.0）</p>
+  </div>
+</div>
+
+<div id="pause" class="overlay"><div class="card small"><h2>暂停</h2><button id="btnResume" class="primary">继续</button><button id="btnQuit" class="ghostBtn">返回标题</button></div></div>
+
+<div id="end" class="overlay"><div class="card small">
+  <h1 id="endTitle">失败</h1><p id="endSub"></p><p id="endStats"></p>
+  <button id="btnAgain" class="primary">再来一次</button>
+</div></div>
+
+<script>
+  // Babylon.js：优先官方 CDN，失败则使用仓库内备份
+  function bootMain() { var s = document.createElement('script'); s.type = 'module'; s.src = 'js/main.js'; document.body.appendChild(s); }
+  function loadLocal() { var s = document.createElement('script'); s.src = 'vendor/babylon.js'; s.onload = bootMain; s.onerror = function () { document.querySelector('#loading p').textContent = '引擎加载失败，请检查网络后刷新'; }; document.head.appendChild(s); }
+  (function () {
+    var s = document.createElement('script'); var done = false;
+    s.src = 'https://cdn.babylonjs.com/babylon.js';
+    var timer = setTimeout(function () { if (!done) { done = true; loadLocal(); } }, 12000);
+    s.onload = function () { if (done) return; done = true; clearTimeout(timer); bootMain(); };
+    s.onerror = function () { if (done) return; done = true; clearTimeout(timer); loadLocal(); };
+    document.head.appendChild(s);
+  })();
+</script>
+</body>
+</html>

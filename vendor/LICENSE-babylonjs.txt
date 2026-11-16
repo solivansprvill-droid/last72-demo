@@ -1,0 +1,3 @@
+Babylon.js — Copyright (c) Microsoft Corporation / Babylon.js contributors
+Licensed under the Apache License, Version 2.0. https://www.apache.org/licenses/LICENSE-2.0
+Source: https://github.com/BabylonJS/Babylon.js  (npm package "babylonjs" 9.37.0, file babylon.js)
