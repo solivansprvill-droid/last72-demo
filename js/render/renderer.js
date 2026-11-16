@@ -23,6 +23,7 @@ export class Renderer {
     scene.fogDensity = 0.02;
     this.cam = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 10, -10), scene);
     this.cam.fov = this.mobile ? 1.0 : 0.9; this.cam.minZ = 0.1; this.cam.maxZ = 140;
+    this.viewDist = this.mobile ? 56 : 72;
     this.camYaw = 0; this.camPitch = 0.38; this.camDist = this.mobile ? 7.5 : 6.5; this.curDist = this.camDist;
     this.hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.35, 1, 0.2), scene);
     this.hemi.specular = new BABYLON.Color3(0, 0, 0);
@@ -96,23 +97,37 @@ export class Renderer {
 
     // 感染者（风格化体素人形，无血腥）
     const zskin = [0.46, 0.55, 0.45], eye = [0.95, 0.66, 0.2];
-    const mkBody = (shirt, pantsC) => {
+    const mkBody = (shirt, pantsC, kind) => {
       const g = new GeoBuilder();
-      g.box(-0.3, 0.8, -0.16, 0.3, 1.38, 0.16, shirt);
+      const sk = kind === 'bloater' ? [0.55, 0.6, 0.38] : kind === 'climber' ? [0.5, 0.52, 0.55] : zskin;
+      if (kind === 'bloater') { // 臃肿的身体 + 发光囊泡（无血腥）
+        g.box(-0.42, 0.75, -0.3, 0.42, 1.45, 0.32, shirt);
+        g.box(-0.3, 0.9, 0.3, 0.3, 1.35, 0.42, [0.85, 0.62, 0.2], false);
+        g.box(-0.36, 1.2, -0.36, -0.12, 1.42, -0.28, [0.85, 0.62, 0.2], false); g.box(0.2, 0.95, -0.36, 0.38, 1.15, -0.28, [0.85, 0.62, 0.2], false);
+      } else g.box(-0.3, 0.8, -0.16, 0.3, 1.38, 0.16, shirt);
       g.box(-0.3, 0.8, -0.165, -0.05, 0.95, 0.165, pantsC);
-      g.box(-0.2, 1.38, -0.2, 0.2, 1.76, 0.2, zskin);
-      g.box(-0.21, 1.66, -0.21, 0.21, 1.78, 0.21, [0.22, 0.24, 0.2]);
+      g.box(-0.2, 1.38, -0.2, 0.2, 1.76, 0.2, sk);
+      g.box(-0.21, 1.66, -0.21, 0.21, 1.78, 0.21, kind === 'boss' ? [0.35, 0.2, 0.18] : [0.22, 0.24, 0.2]);
       g.box(-0.13, 1.54, 0.2, -0.05, 1.6, 0.215, eye, false); g.box(0.05, 1.54, 0.2, 0.13, 1.6, 0.215, eye, false);
+      if (kind === 'boss') { g.box(-0.42, 1.1, -0.22, 0.42, 1.42, 0.22, [0.42, 0.24, 0.2]); g.box(-0.46, 1.32, -0.2, -0.28, 1.5, 0.2, [0.3, 0.32, 0.34]); g.box(0.28, 1.32, -0.2, 0.46, 1.5, 0.2, [0.3, 0.32, 0.34]); }
+      if (kind === 'climber') { g.box(-0.22, 1.2, -0.22, 0.22, 1.3, -0.16, [0.2, 0.2, 0.22]); }
       return g;
     };
-    this.zBody = { walker: this.thin(this.meshFrom('zBodyW', mkBody([0.26, 0.33, 0.42], [0.2, 0.22, 0.26])), 32), runner: this.thin(this.meshFrom('zBodyR', mkBody([0.45, 0.16, 0.15], [0.16, 0.16, 0.18])), 32) };
+    this.zKinds = ['walker', 'runner', 'climber', 'bloater', 'boss'];
+    this.zBody = {
+      walker: this.thin(this.meshFrom('zBodyW', mkBody([0.26, 0.33, 0.42], [0.2, 0.22, 0.26], 'walker')), 40),
+      runner: this.thin(this.meshFrom('zBodyR', mkBody([0.45, 0.16, 0.15], [0.16, 0.16, 0.18], 'runner')), 40),
+      climber: this.thin(this.meshFrom('zBodyC', mkBody([0.34, 0.3, 0.42], [0.18, 0.18, 0.2], 'climber')), 40),
+      bloater: this.thin(this.meshFrom('zBodyB', mkBody([0.46, 0.44, 0.26], [0.25, 0.22, 0.16], 'bloater')), 40),
+      boss: this.thin(this.meshFrom('zBodyX', mkBody([0.32, 0.26, 0.22], [0.16, 0.15, 0.15], 'boss')), 4),
+    };
     const zl = new GeoBuilder(); zl.box(-0.12, -0.8, -0.12, 0.12, 0, 0.12, [0.22, 0.23, 0.27]); zl.box(-0.12, -0.8, -0.12, 0.12, -0.7, 0.15, [0.12, 0.12, 0.12]);
-    this.zLeg = this.thin(this.meshFrom('zLeg', zl), 64);
+    this.zLeg = this.thin(this.meshFrom('zLeg', zl), 96);
     const za = new GeoBuilder(); za.box(-0.09, -0.62, -0.09, 0.09, 0, 0.09, zskin);
-    this.zArm = this.thin(this.meshFrom('zArm', za), 64);
+    this.zArm = this.thin(this.meshFrom('zArm', za), 96);
     // 碎块
     const cube = new GeoBuilder(); cube.box(-0.5, -0.5, -0.5, 0.5, 0.5, 0.5, [1, 1, 1]);
-    this.debrisMesh = this.thin(this.meshFrom('debris', cube), 220);
+    this.debrisMesh = this.thin(this.meshFrom('debris', cube), 320);
     // 建造预览
     this.ghost = BABYLON.MeshBuilder.CreateBox('ghost', { size: 1 }, this.scene);
     this.ghostMat = new BABYLON.StandardMaterial('gm', this.scene);
@@ -191,7 +206,10 @@ export class Renderer {
       if (ct !== 0 && ct !== B.LEAF && ct !== B.S_SPIKE) { dist = Math.max(0.6, s - 0.35); break; }
     }
     this.curDist = dist < this.curDist ? dist : lerp(this.curDist, dist, Math.min(1, dt * 5));
-    this.cam.position.set(tx + bx * this.curDist, ty + by * this.curDist, tz + bz * this.curDist);
+    this.shake = Math.max(0, (this.shake || 0) - dt * 1.6);
+    const sh = this.shakeOn === false ? 0 : this.shake * 0.35;
+    const jx = (Math.random() - 0.5) * sh, jy = (Math.random() - 0.5) * sh;
+    this.cam.position.set(tx + bx * this.curDist + jx, ty + by * this.curDist + jy, tz + bz * this.curDist);
     this.cam.setTarget(new BABYLON.Vector3(tx, ty - 0.25, tz));
 
     // 昼夜
@@ -262,39 +280,44 @@ export class Renderer {
   updateZombies(game, dt) {
     const BABYLON = BJ();
     const M = this._m, list = game.zm.list;
-    const counts = { walker: 0, runner: 0 }; let nl = 0, na = 0;
-    const bufs = {
-      walker: this.zBody.walker._mat, runner: this.zBody.runner._mat,
-    };
+    const counts = {}; for (const k of this.zKinds) counts[k] = 0;
+    let nl = 0, na = 0;
     const leg = this.zLeg, arm = this.zArm;
-    const legM = leg._mat, armM = arm._mat;
-    const colW = this.zBody.walker._col, colR = this.zBody.runner._col;
-    const legC = leg._col, armC = arm._col;
+    const legM = leg._mat, armM = arm._mat, legC = leg._col, armC = arm._col;
     const scl = new BABYLON.Vector3(1, 1, 1), pos = new BABYLON.Vector3();
+    const cam = this.cam.position;
     for (const zb of list) {
-      const s = zb.type === 'runner' ? 0.92 : 1.0;
+      if (Math.abs(zb.x - cam.x) + Math.abs(zb.z - cam.z) > this.viewDist + 8) continue; // 视距外不绘制
+      const body = this.zBody[zb.type]; const bi = counts[zb.type];
+      if (bi >= body._cap) continue;
+      counts[zb.type]++;
+      let s = zb.type === 'boss' ? 1.9 : zb.type === 'runner' ? 0.92 : zb.type === 'bloater' ? 1.08 : 1.0;
+      if (zb.fuse > 0) s *= 1 + Math.sin(performance.now() / 40) * 0.06 + 0.08;
       scl.set(s, s, s); pos.set(zb.x, zb.y, zb.z);
-      BABYLON.Quaternion.RotationYawPitchRollToRef(zb.yaw, zb.type === 'runner' && zb.state === 'chase' ? 0.18 : 0.05, 0, M.q);
+      const lean = zb.climbing ? -0.5 : (zb.type === 'runner' || zb.type === 'climber') && zb.state === 'chase' ? 0.22 : 0.05;
+      BABYLON.Quaternion.RotationYawPitchRollToRef(zb.yaw, lean, 0, M.q);
       BABYLON.Matrix.ComposeToRef(scl, M.q, pos, M.r);
-      const f = zb.flash > 0 ? 2.2 : 1;
-      // 身体
-      const bi = counts[zb.type]++;
-      M.r.copyToArray(bufs[zb.type], bi * 16);
-      const cb = zb.type === 'runner' ? colR : colW; cb[bi * 4] = f; cb[bi * 4 + 1] = f; cb[bi * 4 + 2] = f; cb[bi * 4 + 3] = 1;
+      const f = zb.flash > 0 ? 2.4 : (zb.fuse > 0 ? 1.6 : 1);
+      M.r.copyToArray(body._mat, bi * 16);
+      const cb = body._col; cb[bi * 4] = f; cb[bi * 4 + 1] = f; cb[bi * 4 + 2] = zb.fuse > 0 ? 0.6 : f; cb[bi * 4 + 3] = 1;
       const sw = Math.sin(zb.walk * (zb.type === 'runner' ? 3.2 : 2.4)) * 0.6;
       for (const [px, a] of [[-0.14, sw], [0.14, -sw]]) {
+        if (nl >= leg._cap) break;
         BABYLON.Matrix.RotationXToRef(a, M.l); BABYLON.Matrix.TranslationToRef(px, 0.8, 0, M.t);
         M.l.multiplyToRef(M.t, M.o); M.o.multiplyToRef(M.r, M.l);
         M.l.copyToArray(legM, nl * 16); legC[nl * 4] = f; legC[nl * 4 + 1] = f; legC[nl * 4 + 2] = f; legC[nl * 4 + 3] = 1; nl++;
       }
       const atk = zb.swing ? Math.sin(zb.swing / 0.35 * Math.PI) * 0.8 : 0;
-      for (const [px, a] of [[-0.39, -1.45 + sw * 0.15 - atk], [0.39, -1.45 - sw * 0.15 - atk]]) {
+      const up = zb.climbing ? -2.6 : -1.45;
+      const ax = zb.type === 'bloater' ? 0.5 : 0.39;
+      for (const [px, a] of [[-ax, up + sw * 0.15 - atk], [ax, up - sw * 0.15 - atk]]) {
+        if (na >= arm._cap) break;
         BABYLON.Matrix.RotationXToRef(a, M.l); BABYLON.Matrix.TranslationToRef(px, 1.34, 0, M.t);
         M.l.multiplyToRef(M.t, M.o); M.o.multiplyToRef(M.r, M.l);
         M.l.copyToArray(armM, na * 16); armC[na * 4] = f; armC[na * 4 + 1] = f; armC[na * 4 + 2] = f; armC[na * 4 + 3] = 1; na++;
       }
     }
-    for (const k of ['walker', 'runner']) { const m = this.zBody[k]; m.thinInstanceCount = counts[k]; m.thinInstanceBufferUpdated('matrix'); m.thinInstanceBufferUpdated('color'); }
+    for (const k of this.zKinds) { const m = this.zBody[k]; m.thinInstanceCount = counts[k]; m.thinInstanceBufferUpdated('matrix'); m.thinInstanceBufferUpdated('color'); }
     leg.thinInstanceCount = nl; arm.thinInstanceCount = na;
     leg.thinInstanceBufferUpdated('matrix'); leg.thinInstanceBufferUpdated('color');
     arm.thinInstanceBufferUpdated('matrix'); arm.thinInstanceBufferUpdated('color');
@@ -342,8 +365,17 @@ export class Renderer {
       case 'hit': this.spawnDebris(e.x, e.y, e.z, COLORS[e.block] || [0.5, 0.5, 0.5], 4, 0.18, 2.5); break;
       case 'structHit': this.spawnDebris(e.x, e.y, e.z, COLORS[e.t] || [0.5, 0.4, 0.3], 2, 0.15, 2); break;
       case 'zhit': this.spawnDebris(e.x, e.y, e.z, [0.6, 0.62, 0.58], 3, 0.12, 2.5); break;
+      case 'explode': { // 风格化方块爆散
+        this.spawnDebris(e.x, e.y, e.z, [0.95, 0.62, 0.18], 14, 0.3, 9);
+        this.spawnDebris(e.x, e.y, e.z, [0.55, 0.6, 0.38], 12, 0.26, 7);
+        this.spawnDebris(e.x, e.y + 0.5, e.z, [0.35, 0.34, 0.33], 8, 0.4, 4);
+        this.shake = Math.max(this.shake || 0, 0.6 * Math.max(0.2, 1 - Math.hypot(e.x - this.player.position.x, e.z - this.player.position.z) / 18));
+        this.flashT = 0.25; break;
+      }
+      case 'stomp': this.spawnDebris(e.x, 1.1, e.z, [0.4, 0.38, 0.35], 6, 0.22, 4); this.shake = Math.max(this.shake || 0, 0.25); break;
       case 'zdeath': { // 碎成方块
-        const shirt = e.ztype === 'runner' ? [0.45, 0.16, 0.15] : [0.26, 0.33, 0.42];
+        const shirt = { runner: [0.45, 0.16, 0.15], climber: [0.34, 0.3, 0.42], bloater: [0.46, 0.44, 0.26], boss: [0.32, 0.26, 0.22] }[e.ztype] || [0.26, 0.33, 0.42];
+        if (e.ztype === 'boss') { this.spawnDebris(e.x, e.y + 2.5, e.z, shirt, 30, 0.5, 6); this.shake = 0.6; }
         this.spawnDebris(e.x, e.y + 1.5, e.z, [0.46, 0.55, 0.45], 5, 0.26, 3.5);
         this.spawnDebris(e.x, e.y + 1.1, e.z, shirt, 7, 0.28, 3.5);
         this.spawnDebris(e.x, e.y + 0.4, e.z, [0.22, 0.23, 0.27], 5, 0.24, 3);

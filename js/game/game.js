@@ -2,7 +2,7 @@
 import { World, generateWorld, W, D, B } from './voxels.js';
 import { moveEntity, collides } from './physics.js';
 import { Nav } from './nav.js';
-import { ZombieManager, MAX_Z } from './zombies.js';
+import { ZombieManager, MAX_Z, ZTYPES, EXPLODE } from './zombies.js';
 import { ITEMS, RECIPES, FIST, Inventory, rollLoot, itemName } from './items.js';
 import { BUILDS, BUILD_BY_ID, canPlace, placeStruct, removeStruct, setDoor, setLamp, GEN_RANGE, LAMP_RADIUS, FUEL_HOURS } from './builds.js';
 
@@ -14,10 +14,11 @@ export { BUILDS };
 export const RES_NAMES = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, v.name]));
 
 export const WAVES = [
-  { warn: 16, start: 18, count: 12, rr: 0.25, name: '第一次尸潮' },
-  { warn: 40, start: 42, count: 18, rr: 0.4, name: '第二次尸潮' },
-  { warn: 66, start: 68, count: 26, rr: 0.5, name: '最终尸潮' },
+  { warn: 16, start: 18, count: 12, mix: { walker: 0.75, runner: 0.25 }, name: '第一次尸潮' },
+  { warn: 40, start: 42, count: 20, mix: { walker: 0.45, runner: 0.28, climber: 0.17, bloater: 0.1 }, name: '第二次尸潮' },
+  { warn: 64, start: 66, count: 28, mix: { walker: 0.33, runner: 0.3, climber: 0.2, bloater: 0.17 }, boss: true, name: '最终尸潮' },
 ];
+function pickMix(mix) { let r = Math.random(), last = 'walker'; for (const k in mix) { last = k; r -= mix[k]; if (r <= 0) return k; } return last; }
 export const AIRDROPS = [30, 54];
 
 export const MISSIONS = [
@@ -37,6 +38,7 @@ export class Game {
   constructor(opts = {}) {
     this.world = generateWorld(72);
     this.nav = new Nav(this.world);
+    this.climbNav = new Nav(this.world, true);
     this.zm = new ZombieManager(this);
     this.events = [];
     this.player = {
@@ -118,6 +120,7 @@ export class Game {
     if (ml > 1) { mx /= ml; mz /= ml; }
     const fx = Math.sin(cy), fz = Math.cos(cy), rx = Math.cos(cy), rz = -Math.sin(cy);
     let vx = fx * mz + rx * mx, vz = fz * mz + rz * mx;
+    p.kx = (p.kx || 0) * Math.max(0, 1 - dt * 5); p.kz = (p.kz || 0) * Math.max(0, 1 - dt * 5);
     const moving = ml > 0.1;
     p.running = moving && inp.run && p.stamina > 3;
     const speed = p.running ? 6.6 : 4.2;
@@ -126,7 +129,7 @@ export class Game {
     if (moving) { const ty = Math.atan2(vx, vz); p.yaw += ang(ty - p.yaw) * Math.min(1, dt * 12); }
     if (inp.jump && p.onGround && p.stamina >= 5) { p.vy = 8.2; p.stamina -= 5; p.onGround = false; this.emit({ type: 'jump' }); }
     const ox = p.x, oz = p.z;
-    moveEntity(this.world, p, vx * dt, vz * dt, dt);
+    moveEntity(this.world, p, (vx + p.kx) * dt, (vz + p.kz) * dt, dt);
     p.x = Math.max(0.5, Math.min(W - 0.5, p.x)); p.z = Math.max(0.5, Math.min(D - 0.5, p.z));
     const md = Math.hypot(p.x - ox, p.z - oz);
     p.moved += md; p.walk += md;
@@ -177,7 +180,20 @@ export class Game {
     const o = tgtObj || this.forwardObject();
     if (o) this.harvest(o, wp.harvest);
   }
-  noise() { /* M3：声音吸引感染者 */ }
+  // 声音：战斗、爆炸、发电机会吸引附近感染者前来调查
+  noise(x, z, r, quiet) { this.zm.noise(x, z, r); if (!quiet) this.lastNoise = { x, z, r, t: this.time }; }
+  explode(x, y, z, src) {
+    const { r, dmg, sdmg, zdmg } = EXPLODE, p = this.player;
+    const pd = Math.hypot(p.x - x, p.z - z, (p.y + 0.9) - y);
+    if (pd < r) { const k = 1 - pd / r; this.damagePlayer(Math.round(dmg * (0.35 + 0.65 * k)), src); const a = Math.atan2(p.x - x, p.z - z); p.kx = Math.sin(a) * 8 * k; p.kz = Math.cos(a) * 8 * k; p.vy = 5 * k; }
+    if (this.npcs) for (const n of this.npcs.list) { if (n.dead || !n.met) continue; const d = Math.hypot(n.x - x, n.z - z); if (d < r) this.damageNpc(n, Math.round(dmg * 0.7 * (1 - d / r) + 6), src); }
+    for (const zb of this.zm.list) { if (zb === src) continue; const d = Math.hypot(zb.x - x, zb.z - z); if (d < r) this.zm.hurt(zb, Math.round(zdmg * (1 - d / r) + 10), (zb.x - x) * 3, (zb.z - z) * 3); }
+    for (const s of [...this.world.structs.values()]) {
+      const d = Math.hypot(s.x + 0.5 - x, s.z + 0.5 - z); if (d < r + 0.5 && Math.abs(s.y - y) < 3) this.damageStruct(s, Math.round(sdmg * Math.max(0.3, 1 - d / (r + 0.5))));
+    }
+    this.emit({ type: 'explode', x, y, z, r });
+    this.noise(x, z, 26);
+  }
   forwardObject() {
     const p = this.player, fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
     for (const hgt of [0.5, 1.3, 2.2]) for (let s = 0.3; s <= 1.9; s += 0.2) {
@@ -498,8 +514,14 @@ export class Game {
       if (aw.spawned < aw.count && this.waveSpawnT <= 0 && this.zm.alive < MAX_Z) {
         this.waveSpawnT = 1.2;
         const [x, z] = this.spawnPoint(18);
-        const zb = this.zm.spawn(Math.random() < aw.rr ? 'runner' : 'walker', x + Math.random() - 0.5, z + Math.random() - 0.5, aw.idx + 1);
+        const zb = this.zm.spawn(pickMix(aw.mix), x + Math.random() - 0.5, z + Math.random() - 0.5, aw.idx + 1);
         if (zb) aw.spawned++;
+      }
+      if (aw.boss && !aw.bossSpawned && aw.spawned >= 6) {
+        aw.bossSpawned = true;
+        const [x, z] = this.spawnPoint(24);
+        this.boss = this.zm.spawn('boss', x, z, aw.idx + 1);
+        this.emit({ type: 'banner', text: '⚠ 巨型感染者出现了！', sub: '它会砸毁路障——用陷阱和照明灯拖住它', kind: 'wave' }); this.emit({ type: 'boss' });
       }
       const remaining = this.zm.list.filter(z => z.wave === aw.idx + 1).length;
       if (aw.spawned >= aw.count && remaining === 0) {
@@ -516,7 +538,7 @@ export class Game {
       const ambient = this.zm.list.filter(z => !z.wave).length;
       if (ambient < target && this.zm.alive < MAX_Z - 2 && this.T > 0.6) {
         const [x, z] = this.spawnPoint(22);
-        this.zm.spawn(Math.random() < (this.isNight() ? 0.3 : 0.12) * d ? 'runner' : 'walker', x, z, 0);
+        this.zm.spawn(this.ambientType(), x, z, 0);
       }
     }
     if (this.airdropIdx < AIRDROPS.length && T >= AIRDROPS[this.airdropIdx]) {
@@ -529,6 +551,12 @@ export class Game {
       this.emit({ type: 'banner', text: '撤离直升机已抵达北部撤离点！', sub: '直升机只会停留 5 小时，快跑！', kind: 'evac' });
       this.emit({ type: 'evac' });
     }
+  }
+  ambientType() {
+    const d = this.day(), n = this.isNight(), r = Math.random();
+    if (d >= 2 && r < 0.06 * (d - 1)) return 'bloater';
+    if (d >= 2 && r < 0.16 * (d - 1)) return 'climber';
+    return Math.random() < (n ? 0.3 : 0.12) * d ? 'runner' : 'walker';
   }
   dropSupplies() {
     let n = 0;

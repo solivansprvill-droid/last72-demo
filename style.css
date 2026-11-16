@@ -128,3 +128,5 @@ body.touch .bexit { left: 140px; transform: none; bottom: 64px; }
   #bag, #side { width: 270px; max-height: 92vh; overflow-y: auto; }
   .slot { height: 32px; }
 }
+#bossBar { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); width: min(340px, 50vw); display: none; text-align: center; font-size: 12px; color: #f2d6a0; text-shadow: 1px 1px 0 #000; }
+#bossBar .bar { height: 9px; margin-top: 2px; } #bossBar .bar i { background: #b8402f; }

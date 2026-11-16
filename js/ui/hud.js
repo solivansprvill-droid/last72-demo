@@ -52,6 +52,9 @@ export class Hud {
     for (const el of document.querySelectorAll('#res b')) el.textContent = el.dataset.k.split('+').reduce((a, k) => a + game.inv.count(k), 0);
     const eq = game.equip;
     $('weaponTxt').textContent = eq ? `${ITEMS[eq.id].name} ${Math.ceil(eq.dur)}/${ITEMS[eq.id].weapon.dur}` : '徒手';
+    const bz = game.boss && game.boss.hp > 0 ? game.boss : null;
+    $('bossBar').style.display = bz ? 'block' : 'none';
+    if (bz) $('bossHp').style.width = (bz.hp / bz.max * 100) + '%';
     this.renderBag(game);
     this.renderSide(game);
     // 建造

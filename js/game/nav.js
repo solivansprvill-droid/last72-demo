@@ -2,11 +2,11 @@
 import { W, D, B, SOLID } from './voxels.js';
 
 const INF = 1e9;
-export const CELL_OPEN = 0, CELL_BLOCK = 1, CELL_STRUCT = 2, CELL_STEP = 3;
+export const CELL_OPEN = 0, CELL_BLOCK = 1, CELL_STRUCT = 2, CELL_STEP = 3, CELL_CLIMB = 4;
 
 export class Nav {
-  constructor(world) {
-    this.world = world;
+  constructor(world, climb = false) {
+    this.world = world; this.climb = climb;
     this.kind = new Uint8Array(W * D);
     this.dist = new Float32Array(W * D).fill(INF);
     this.ver = -1; this.timer = 0;
@@ -21,6 +21,8 @@ export class Nav {
       if (st && SOLID[t1] && st.type !== 'box' && st.type !== 'bench' && st.type !== 'gen') k = CELL_STRUCT;
       else if (SOLID[t1]) k = (!SOLID[t2] && !SOLID[t3]) ? CELL_STEP : CELL_BLOCK;
       else if (SOLID[t2]) k = CELL_BLOCK;
+      // 攀爬者：2 格以内的障碍（汽车、墙、路障）可翻越
+      if (this.climb && (k === CELL_BLOCK || k === CELL_STRUCT) && !SOLID[t3] && !SOLID[w.get(x, 4, z)] && !SOLID[w.get(x, 5, z)]) k = CELL_CLIMB;
       this.kind[x + z * W] = k;
     }
     this.ver = w.version;
@@ -30,6 +32,7 @@ export class Nav {
     if (k === CELL_BLOCK) return INF;
     if (k === CELL_STRUCT) { const s = this.world.cellStruct.get(i + W * D); return s && (s.type === 'bar' || s.type === 'tower') ? 22 : 14; }
     if (k === CELL_STEP) return 2.5;
+    if (k === CELL_CLIMB) return 3.5;
     return 1;
   }
   update(dt, px, pz) {
