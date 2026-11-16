@@ -1,0 +1,214 @@
+{
+ "results": [
+  {
+   "id": "inv_stack_capacity",
+   "system": "背包堆叠与容量",
+   "ok": true,
+   "info": "wood40,wood5,stone1"
+  },
+  {
+   "id": "inv_full_reject",
+   "system": "背包堆叠与容量",
+   "ok": true,
+   "info": "crate alive=true"
+  },
+  {
+   "id": "equip_weapon",
+   "system": "装备武器",
+   "ok": true,
+   "info": "44->28"
+  },
+  {
+   "id": "craft_all",
+   "system": "工作台合成",
+   "ok": true,
+   "info": "true,true,true,true,true,true"
+  },
+  {
+   "id": "craft_no_bench",
+   "system": "工作台合成",
+   "ok": true,
+   "info": "refused"
+  },
+  {
+   "id": "build_all",
+   "system": "工事放置",
+   "ok": true,
+   "info": "true,true,true,true,true,true,true,true,true,true"
+  },
+  {
+   "id": "build_blocked",
+   "system": "工事放置",
+   "ok": true,
+   "info": "已有其他工事"
+  },
+  {
+   "id": "door_toggle",
+   "system": "门开关",
+   "ok": true,
+   "info": "true->false"
+  },
+  {
+   "id": "chest_deposit_withdraw",
+   "system": "储物箱存取",
+   "ok": true,
+   "info": "box 9->8"
+  },
+  {
+   "id": "climb_watchtower",
+   "system": "登瞭望塔",
+   "ok": true,
+   "info": "y 5->1"
+  },
+  {
+   "id": "generator_fuel_light",
+   "system": "发电机加油点亮照明灯",
+   "ok": true,
+   "info": "fuel 6.0 lit true"
+  },
+  {
+   "id": "infected_types",
+   "system": "感染者",
+   "ok": true,
+   "info": "5 alive after hits"
+  },
+  {
+   "id": "infected_climber",
+   "system": "感染者-攀爬者",
+   "ok": true,
+   "skip": true,
+   "info": "见 tests/logic.mjs"
+  },
+  {
+   "id": "infected_bloater",
+   "system": "感染者-爆裂者",
+   "ok": true,
+   "skip": true,
+   "info": "见 tests/logic.mjs"
+  },
+  {
+   "id": "infected_boss",
+   "system": "感染者-巨型感染者",
+   "ok": true,
+   "skip": true,
+   "info": "见 tests/logic.mjs"
+  },
+  {
+   "id": "explosion_damage_structure",
+   "system": "爆炸损毁工事",
+   "ok": true,
+   "skip": true,
+   "info": "见 tests/logic.mjs"
+  },
+  {
+   "id": "sound_attract",
+   "system": "声音吸引",
+   "ok": true,
+   "info": "investigate"
+  },
+  {
+   "id": "stair_climb",
+   "system": "上楼梯",
+   "ok": true,
+   "skip": true,
+   "info": "见 tests/logic.mjs"
+  },
+  {
+   "id": "npc_dialogue_recruit",
+   "system": "NPC对话与招募",
+   "ok": true,
+   "info": "true,true,true,true,true,true wall cost 3"
+  },
+  {
+   "id": "npc_commands",
+   "system": "NPC命令",
+   "ok": true,
+   "info": "hp 80 inf 10"
+  },
+  {
+   "id": "sleep",
+   "system": "睡觉",
+   "ok": true,
+   "info": "睡觉（疲劳 60）"
+  },
+  {
+   "id": "infection_value",
+   "system": "感染值",
+   "ok": true,
+   "info": "25->0"
+  },
+  {
+   "id": "minimap_display",
+   "system": "小地图",
+   "ok": true,
+   "info": "bigmap toggled"
+  },
+  {
+   "id": "weather_cycle",
+   "system": "天气",
+   "ok": true,
+   "info": "rain/fog"
+  },
+  {
+   "id": "save_load",
+   "system": "存档读档",
+   "ok": true,
+   "info": "[3,10,6,true,20] vs [3,10,9,true,20]（读档后任务可自动推进）"
+  },
+  {
+   "id": "settings_menu",
+   "system": "设置",
+   "ok": true,
+   "info": "{\"quality\":\"low\",\"volume\":0.4,\"sens\":1,\"shake\":true,\"vd\":44}"
+  },
+  {
+   "id": "pause_menu",
+   "system": "暂停",
+   "ok": true,
+   "info": "20.009 20.009 20.042"
+  },
+  {
+   "id": "audio_synth",
+   "system": "音效",
+   "ok": true,
+   "info": "ctx running"
+  },
+  {
+   "id": "ending_all",
+   "system": "结局画面-全员撤离",
+   "ok": true,
+   "info": "结局：全员撤离"
+  },
+  {
+   "id": "ending_alone",
+   "system": "结局画面-独自撤离",
+   "ok": true,
+   "info": "结局：独自撤离"
+  },
+  {
+   "id": "ending_stay",
+   "system": "结局画面-留守",
+   "ok": true,
+   "info": "结局：留守"
+  },
+  {
+   "id": "ending_infected",
+   "system": "结局画面-感染",
+   "ok": true,
+   "info": "结局：感染"
+  },
+  {
+   "id": "ending_dead",
+   "system": "结局画面-阵亡",
+   "ok": true,
+   "info": "结局：阵亡"
+  },
+  {
+   "id": "touch_joystick_buttons",
+   "system": "触屏摇杆与按钮",
+   "ok": true,
+   "info": "moved 4.2 swing true build true bag true"
+  }
+ ],
+ "consoleErrors": []
+}

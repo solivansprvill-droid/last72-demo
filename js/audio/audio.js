@@ -1,4 +1,5 @@
 // WebAudio 程序化音效（无任何音频采样文件，全部实时合成）
+// 初稿：副手模型（Numes GLM-5.3）；主 Agent 审核合并：保留包络防爆音/音量记忆/滤波低吼，采纳其噪声旋翼、滤波扫频、琶音提示音
 export class Audio {
   constructor() { this.ctx = null; this.vol = 0.7; this.last = {}; this.groanT = 2; }
   init() {
@@ -15,10 +16,17 @@ export class Audio {
     this.wind = this.loopNoise(380, 0.0); this.rain = this.loopNoise(2600, 0.0, 'highpass'); this.rain2 = this.loopNoise(900, 0.0);
     // 夜间低频嗡鸣
     const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 55; const og = c.createGain(); og.gain.value = 0; o.connect(og); og.connect(this.amb); o.start(); this.drone = og;
-    // 直升机旋翼
-    const h = c.createOscillator(); h.type = 'square'; h.frequency.value = 70; const hf = c.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 220;
-    const hg = c.createGain(); hg.gain.value = 0; const lfo = c.createOscillator(); lfo.frequency.value = 9; const lg = c.createGain(); lg.gain.value = 0;
-    lfo.connect(lg); lg.connect(hg.gain); h.connect(hf); hf.connect(hg); hg.connect(this.amb); h.start(); lfo.start(); this.heli = { g: hg, lg };
+    // 尸潮时的低频噪声层（副手稿）
+    this.horde = this.loopNoise(200, 0.0);
+    // 直升机旋翼：带通噪声 + 13Hz LFO 振幅调制（副手稿，比方波更像旋翼扑动）
+    const hs = c.createBufferSource(); hs.buffer = this.noiseBuf; hs.loop = true;
+    const hf = c.createBiquadFilter(); hf.type = 'bandpass'; hf.frequency.value = 400; hf.Q.value = 1.5;
+    const throb = c.createGain(); throb.gain.value = 0.5;
+    const lfo = c.createOscillator(); lfo.frequency.value = 13; const lg = c.createGain(); lg.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(throb.gain); lfo.start();
+    const hg = c.createGain(); hg.gain.value = 0;
+    hs.connect(hf); hf.connect(throb); throb.connect(hg); hg.connect(this.amb); hs.start();
+    this.heli = { g: hg };
   }
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
   loopNoise(freq, gain, type = 'lowpass') {
@@ -33,9 +41,10 @@ export class Audio {
     o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     o.connect(g); g.connect(this.sfx); this.env(g, t, 0.005, peak, dur); o.start(t); o.stop(t + dur + 0.05);
   }
-  noise(freq, dur, peak = 0.3, type = 'lowpass', delay = 0, q = 1) {
+  noise(freq, dur, peak = 0.3, type = 'lowpass', delay = 0, q = 1, f1 = 0) {
     const c = this.ctx, t = c.currentTime + delay, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-    s.buffer = this.noiseBuf; s.playbackRate.value = 0.8 + Math.random() * 0.4; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    s.buffer = this.noiseBuf; s.playbackRate.value = 0.8 + Math.random() * 0.4; f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+    if (f1) f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur); // 滤波扫频（副手稿）
     s.connect(f); f.connect(g); g.connect(this.sfx); this.env(g, t, 0.004, peak, dur); s.start(t, Math.random()); s.stop(t + dur + 0.05);
   }
   play(type, vol = 1) {
@@ -44,10 +53,10 @@ export class Audio {
     if (this.last[type] && now - this.last[type] < 0.04) return; this.last[type] = now;
     const v = vol;
     switch (type) {
-      case 'swing': this.noise(1800, 0.12, 0.12 * v, 'bandpass', 0, 0.8); break;
+      case 'swing': this.noise(3000, 0.12, 0.14 * v, 'bandpass', 0, 1.5, 600); break;
       case 'hit': this.tone('sine', 150, 60, 0.15, 0.35 * v); this.noise(900, 0.08, 0.2 * v); break;
-      case 'harvest': this.tone('triangle', 220, 120, 0.1, 0.2 * v); this.noise(1400, 0.06, 0.15 * v, 'bandpass'); break;
-      case 'break': this.noise(500, 0.35, 0.35 * v); this.tone('square', 90, 40, 0.25, 0.08 * v); break;
+      case 'harvest': this.tone('triangle', 220, 120, 0.1, 0.2 * v); this.noise(1400, 0.06, 0.15 * v, 'bandpass'); this.tone('triangle', 520, 0, 0.07, 0.08 * v, 0.06); break;
+      case 'break': this.noise(2500, 0.3, 0.35 * v, 'lowpass', 0, 2, 200); this.tone('square', 90, 40, 0.25, 0.08 * v); break;
       case 'place': this.tone('triangle', 330, 200, 0.08, 0.25 * v); this.tone('triangle', 260, 160, 0.08, 0.2 * v, 0.07); break;
       case 'explode': this.noise(300, 1.0, 0.7 * v); this.tone('sine', 80, 25, 0.9, 0.6 * v); this.noise(2500, 0.3, 0.25 * v, 'highpass'); break;
       case 'hurt': this.tone('square', 140, 70, 0.18, 0.18 * v); break;
@@ -63,7 +72,7 @@ export class Audio {
       case 'craft': this.tone('square', 660, 440, 0.06, 0.12 * v); this.tone('square', 880, 660, 0.06, 0.1 * v, 0.08); break;
       case 'door': this.tone('sawtooth', 180, 240, 0.25, 0.06 * v); this.noise(400, 0.1, 0.15 * v, 'lowpass', 0.2); break;
       case 'ui': this.tone('sine', 880, 660, 0.05, 0.08 * v); break;
-      case 'mission': this.tone('sine', 523, 0, 0.12, 0.18 * v); this.tone('sine', 784, 0, 0.18, 0.18 * v, 0.12); break;
+      case 'mission': [523, 659, 784].forEach((f, i) => this.tone('triangle', f, 0, 0.22, 0.18 * v, i * 0.14)); break; // 三音琶音（副手稿，改用音频时钟排程）
       case 'radio': for (let i = 0; i < 4; i++) this.tone('square', 1200, 0, 0.06, 0.08 * v, i * 0.12); this.noise(3000, 0.6, 0.08 * v, 'bandpass', 0.5); break;
       case 'fuse': this.tone('sine', 300, 1200, 0.6, 0.12 * v); break;
       case 'stomp': this.tone('sine', 60, 30, 0.4, 0.5 * v); this.noise(250, 0.3, 0.3 * v); break;
@@ -81,9 +90,10 @@ export class Audio {
     this.wind.f.frequency.setTargetAtTime(300 + Math.sin(t * 0.3) * 120, t, 0.5);
     this.rain.g.gain.setTargetAtTime(w === 'rain' ? 0.12 : 0, t, 0.8); this.rain2.g.gain.setTargetAtTime(w === 'rain' ? 0.1 : 0, t, 0.8);
     this.drone.gain.setTargetAtTime(game.activeWave ? 0.06 : 0.02 * night, t, 0.8);
+    this.horde.g.gain.setTargetAtTime(game.activeWave ? 0.14 : 0, t, 1.2);
     const p = game.player, heli = game.T > 70.5 && game.state === 'play';
-    const hd = heli ? Math.max(0, 1 - Math.hypot(p.x - 47.5, p.z - 179.5) / 120) : 0;
-    this.heli.g.gain.setTargetAtTime(0.12 * hd, t, 0.5); this.heli.lg.gain.setTargetAtTime(0.1 * hd, t, 0.5);
+    const hd = heli ? Math.max(0, 1 - Math.hypot(p.x - 47.5, p.z - 179.5) / 150) : 0;
+    this.heli.g.gain.setTargetAtTime(0.35 * hd, t, 0.5);
     // 附近感染者低吼
     this.groanT -= dt;
     if (this.groanT <= 0) {

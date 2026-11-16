@@ -160,7 +160,14 @@ export class Renderer {
     this.fx = [];
     this.fxMat = new BABYLON.StandardMaterial('fxm', this.scene); this.fxMat.disableLighting = true; this.fxMat.emissiveColor = new BABYLON.Color3(1, 1, 1);
     this.fxMat.transparencyMode = 0; this.mat.transparencyMode = 0;
-    this.fxGlow = this.thin(this.meshFrom('fxg', cube, this.fxMat), 600);
+    // 自发光粒子按颜色分组（不使用实例颜色，规避部分 Babylon 版本的着色器问题）
+    const FXC = { y: [1.2, 0.95, 0.4], o: [1.1, 0.5, 0.12], r: [0.6, 0.2, 0.08], s: [1.3, 1.0, 0.5], rain: [0.55, 0.62, 0.75], c: [0.6, 1.0, 1.3], g: [0.5, 1.3, 0.6] };
+    this.fxBins = {};
+    for (const k in FXC) {
+      const gb = new GeoBuilder(); gb.box(-0.5, -0.5, -0.5, 0.5, 0.5, 0.5, FXC[k], false);
+      const m = this.meshFrom('fx_' + k, gb, this.fxMat); m._mat = new Float32Array(16 * (k === 'rain' ? 300 : 200)); m._cap = k === 'rain' ? 300 : 200;
+      m.thinInstanceSetBuffer('matrix', m._mat, 16, false); m.thinInstanceCount = 0; m.alwaysSelectAsActiveMesh = true; m._n = 0; this.fxBins[k] = m;
+    }
     this.fxSmoke = this.thin(this.meshFrom('fxs', cube), 200);
     this.drops = [];
     this.particleScale = 1; this.fireT = 0;
@@ -435,7 +442,7 @@ export class Renderer {
       if (this.fx.length > 480) this.fx.shift();
       const sp = o.spread ?? 0.3, pw = o.power ?? 1;
       const f = { kind, x: x + (Math.random() - 0.5) * sp, y: y + (Math.random() - 0.5) * sp * 0.5, z: z + (Math.random() - 0.5) * sp, vx: (Math.random() - 0.5) * pw, vy: (o.up ?? 1.5) + Math.random() * pw, vz: (Math.random() - 0.5) * pw, life: (o.life ?? 0.8) * (0.7 + Math.random() * 0.6), s: (o.size ?? 0.18) * (0.7 + Math.random() * 0.6), g: o.grav ?? 0 };
-      f.max = f.life; f.c = o.color ? o.color.map(c => c * (0.85 + Math.random() * 0.3)) : null;
+      f.max = f.life; f.bin = o.bin || null;
       this.fx.push(f);
     }
   }
@@ -451,41 +458,39 @@ export class Renderer {
       }
       for (const s of game.world.structs.values()) if (s.type === 'gen' && s.running && Math.random() < 0.25) this.emitFx('smoke', s.x + 0.7, s.y + 1.1, s.z + 0.5, 1, { spread: 0.1, up: 0.8, power: 0.2, life: 1.5, size: 0.15 });
     }
-    const gm = this.fxGlow, sm = this.fxSmoke; let ng = 0, ns = 0;
+    const sm = this.fxSmoke; let ns = 0; const bins = this.fxBins; for (const k in bins) bins[k]._n = 0;
     const scl = new BABYLON.Vector3(), pos = new BABYLON.Vector3();
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i]; f.life -= dt; if (f.life <= 0) { this.fx.splice(i, 1); continue; }
       f.vy -= f.g * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
       const k = f.life / f.max;
-      const glow = f.kind !== 'smoke', mesh = glow ? gm : sm, n = glow ? ng : ns;
+      const glow = f.kind !== 'smoke';
+      const bk = f.bin || (f.kind === 'fire' ? (k > 0.6 ? 'y' : k > 0.3 ? 'o' : 'r') : 's');
+      const mesh = glow ? bins[bk] : sm, n = glow ? mesh._n : ns;
       if (n >= mesh._cap) continue;
       const sz = f.kind === 'smoke' ? f.s * (1.6 - k) : f.s * (0.3 + k * 0.7);
       scl.set(sz, sz, sz); pos.set(f.x, f.y, f.z);
       BABYLON.Quaternion.RotationYawPitchRollToRef(f.life * 3, f.life * 2, 0, M.q);
       BABYLON.Matrix.ComposeToRef(scl, M.q, pos, M.r); M.r.copyToArray(mesh._mat, n * 16);
-      let c;
-      if (f.c) c = f.c;
-      else if (f.kind === 'fire') c = k > 0.6 ? [1.2, 0.95, 0.4] : k > 0.3 ? [1.1, 0.5, 0.12] : [0.6, 0.2, 0.08];
-      else if (f.kind === 'spark') c = [1.3, 1.0, 0.5];
-      else c = [0.32 + k * 0.1, 0.32 + k * 0.1, 0.34 + k * 0.1];
-      mesh._col[n * 4] = c[0]; mesh._col[n * 4 + 1] = c[1]; mesh._col[n * 4 + 2] = c[2]; mesh._col[n * 4 + 3] = 1;
-      if (glow) ng++; else ns++;
+      if (glow) mesh._n++;
+      else { const c = 0.32 + k * 0.1; mesh._col[n * 4] = c; mesh._col[n * 4 + 1] = c; mesh._col[n * 4 + 2] = c + 0.02; mesh._col[n * 4 + 3] = 1; ns++; }
     }
     sm.thinInstanceCount = ns; sm.thinInstanceBufferUpdated('matrix'); sm.thinInstanceBufferUpdated('color');
     // 雨
     const raining = (game.weather ? game.weather() : 'clear') === 'rain';
-    const want = raining ? Math.round(260 * this.particleScale) : 0, cam = this.cam.position, rm = gm;
+    const want = raining ? Math.round(260 * this.particleScale) : 0, cam = this.cam.position, rm = bins.rain;
     while (this.drops.length < want) this.drops.push({ x: cam.x + (Math.random() - 0.5) * 30, y: cam.y + Math.random() * 16 - 4, z: cam.z + (Math.random() - 0.5) * 30 });
     if (this.drops.length > want) this.drops.length = want;
-    let nr = ng;
+    let nr = 0;
     for (const d of this.drops) {
       if (nr >= rm._cap) break;
       d.y -= 22 * dt; d.x -= 2 * dt;
       if (d.y < cam.y - 8 || Math.abs(d.x - cam.x) > 16 || Math.abs(d.z - cam.z) > 16) { d.x = cam.x + (Math.random() - 0.5) * 30; d.z = cam.z + (Math.random() - 0.5) * 30; d.y = cam.y + 8 + Math.random() * 6; }
       scl.set(0.035, 0.6, 0.035); pos.set(d.x, d.y, d.z); BABYLON.Matrix.ComposeToRef(scl, this._qid || (this._qid = BABYLON.Quaternion.Identity()), pos, M.r); M.r.copyToArray(rm._mat, nr * 16);
-      rm._col[nr * 4] = 0.55; rm._col[nr * 4 + 1] = 0.62; rm._col[nr * 4 + 2] = 0.75; rm._col[nr * 4 + 3] = 1; nr++;
+      nr++;
     }
-    rm.thinInstanceCount = nr; rm.thinInstanceBufferUpdated('matrix'); rm.thinInstanceBufferUpdated('color');
+    rm._n = nr;
+    for (const k in bins) { const m = bins[k]; m.thinInstanceCount = m._n; if (m._n) m.thinInstanceBufferUpdated('matrix'); }
   }
   project(x, y, z) {
     const BABYLON = BJ(), w = this.canvas.clientWidth, h = this.canvas.clientHeight;
@@ -504,9 +509,9 @@ export class Renderer {
       case 'break': for (const b of e.blocks) this.spawnDebris(b.x + 0.5, b.y + 0.5, b.z + 0.5, COLORS[b.t] || [0.5, 0.5, 0.5], 3, 0.32); break;
       case 'hit': this.spawnDebris(e.x, e.y, e.z, COLORS[e.block] || [0.5, 0.5, 0.5], 4, 0.18, 2.5); break;
       case 'structHit': this.spawnDebris(e.x, e.y, e.z, COLORS[e.t] || [0.5, 0.4, 0.3], 2, 0.15, 2); this.emitFx('spark', e.x, e.y + 0.8, e.z, 2, { up: 1, power: 2.5, life: 0.25, size: 0.06, grav: 9 }); break;
-      case 'repairTick': this.emitFx('spark', e.x, 1.6, e.z, 3, { up: 1, power: 2, life: 0.3, size: 0.06, grav: 8, color: [0.6, 1.0, 1.3] }); break;
+      case 'repairTick': this.emitFx('spark', e.x, 1.6, e.z, 3, { up: 1, power: 2, life: 0.3, size: 0.06, grav: 8, bin: 'c' }); break;
       case 'gen': this.emitFx('smoke', e.x + 0.5, 1.6, e.z + 0.5, 4, { up: 1, life: 1.5, size: 0.2 }); break;
-      case 'radio': this.emitFx('spark', 21.5, 12.2, 8.5, 12, { up: 2, power: 2, life: 0.8, size: 0.07, color: [0.5, 1.3, 0.6] }); break;
+      case 'radio': this.emitFx('spark', 21.5, 12.2, 8.5, 12, { up: 2, power: 2, life: 0.8, size: 0.07, bin: 'g' }); break;
       case 'zhit': this.spawnDebris(e.x, e.y, e.z, [0.6, 0.62, 0.58], 3, 0.12, 2.5); this.emitFx('spark', e.x, e.y, e.z, 4, { spread: 0.2, up: 1.5, power: 3, life: 0.3, size: 0.07, grav: 9 }); break;
       case 'explode': { // 风格化方块爆散
         this.emitFx('fire', e.x, e.y, e.z, 26, { spread: 1.5, up: 2.5, power: 6, life: 0.6, size: 0.35 });

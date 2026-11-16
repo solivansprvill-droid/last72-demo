@@ -26,24 +26,24 @@ export const AIRDROPS = [30, 54];
 export const WEATHER = [[7, 12, 'rain'], [30, 34, 'rain'], [37, 46, 'fog'], [50, 57, 'rain'], [61, 70, 'fog']];
 const SLEEP_INPUT = { mx: 0, mz: 0, run: false, jump: false, camYaw: 0, ghostCell: null };
 export const ENDINGS = {
-  all: { name: '全员撤离', win: true, title: '结局：全员撤离', text: (g) => `你和${(g.companions || []).join('、')}一起登上了直升机。新曙光市在身后渐渐远去——你们都活下来了。` },
-  alone: { name: '独自撤离', win: true, title: '结局：独自撤离', text: (g) => (g.companions && g.companions.length ? `你带着${g.companions.join('、')}登上了直升机，但还有人没能一起离开……` : '螺旋桨的轰鸣盖过了一切。你独自离开了这座城市，带着幸存者的记忆。') },
-  stay: { name: '留守', win: true, title: '结局：留守', text: (g) => (g.staying ? '直升机远去，你选择留下守护这片街区的最后一盏灯，等待下一班救援。' : '你错过了直升机。好在防线还在——你决定留守到底，等待下一次机会。') },
-  infected: { name: '感染', win: false, title: '结局：感染', text: () => '伤口的感染终于压垮了你。在意识模糊之前，你把最后的物资留给了后来的人。' },
+  all: { name: '全员撤离', win: true, title: '结局：全员撤离', text: (g) => `你和${(g.companions || []).join('、')}一同登上直升机。新曙光市在身后渐渐远去——你们都活下来了。` },
+  alone: { name: '独自撤离', win: true, title: '结局：独自撤离', text: (g) => (g.companions && g.companions.length ? `你带着${g.companions.join('、')}登上了直升机，但还有人没能一起离开……` : '螺旋桨的轰鸣盖过一切。你独自离开这座城市，带着幸存者的记忆。') },
+  stay: { name: '留守', win: true, title: '结局：留守', text: (g) => (g.staying ? '直升机远去，你选择留下，守护街区的最后一盏灯，等待下一班救援。' : '你错过了直升机。好在防线仍在——你决定坚守到底，等待下一次机会。') },
+  infected: { name: '感染', win: false, title: '结局：感染', text: () => '伤口的感染最终压垮了你。在意识模糊前，你把最后的物资留给了后来的人。' },
   dead: { name: '阵亡', win: false, title: '结局：阵亡', text: (g) => g.loseReason || '你倒在了尸潮之中……新曙光市又少了一位幸存者。' },
 };
 
 export const MISSIONS = [
-  { id: 'wake', text: '醒来：走动一下，熟悉操作' },
-  { id: 'supply', text: '找水和食物：食物×2、水×2（冰箱/物资箱）' },
-  { id: 'wood', text: '收集木材：木材×12（砍树、拆家具）' },
-  { id: 'base', text: '建立基地：放置 4 个工事（按 建造）' },
+  { id: 'wake', text: '苏醒过来：四处走动，熟悉操作' },
+  { id: 'supply', text: '寻找补给：收集食物×2、水×2（冰箱/物资箱）' },
+  { id: 'wood', text: '囤积木材：木材×12（砍树或拆解家具）' },
+  { id: 'base', text: '建立基地：放置 4 个工事（按建造键）' },
   { id: 'wave1', text: '抵御第一次尸潮（第1天 24:00 来袭）' },
-  { id: 'mart', text: '超市补给：搜刮大型超市的货架×4', target: { x: 57, z: 64.5, name: '大型超市' } },
-  { id: 'police', text: '警察局：找到通讯设备（后方装备室）', target: { x: 10.5, z: 115, name: '警察局装备室' } },
-  { id: 'hosp', text: '中心医院：寻找医生和急救药品（楼上）', target: { x: 74.5, z: 140, name: '中心医院' } },
-  { id: 'radio', text: '修复电台：带通讯设备+电子零件×2 回公寓 3 楼', target: { x: 21.5, z: 8.5, name: '公寓 3 楼电台' } },
-  { id: 'evac', text: '坚守到第 72 小时，前往北部撤离区', target: { x: EVAC_POS.x, z: EVAC_POS.z, name: '北部撤离区' } },
+  { id: 'mart', text: '超市补给：搜空大型超市的货架×4', target: { x: 57, z: 64.5, name: '大型超市' } },
+  { id: 'police', text: '潜入警察局：取得通讯设备（后方装备室）', target: { x: 10.5, z: 115, name: '警察局装备室' } },
+  { id: 'hosp', text: '探索中心医院：寻找医生与急救药品（楼上）', target: { x: 74.5, z: 140, name: '中心医院' } },
+  { id: 'radio', text: '修复电台：带通讯设备与电子零件×2，返回公寓 3 楼', target: { x: 21.5, z: 8.5, name: '公寓 3 楼电台' } },
+  { id: 'evac', text: '坚守至第 72 小时，抵达北部撤离区', target: { x: EVAC_POS.x, z: EVAC_POS.z, name: '北部撤离区' } },
 ];
 
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -328,7 +328,7 @@ export class Game {
     }
     this.extraFocus(consider, facing);
     const o = this.forwardObject();
-    if (o) consider(1.2, { kind: 'harvest', o, label: `采集 ${o.name}` });
+    if (o) consider(1.9, { kind: 'harvest', o, label: `采集 ${o.name}` });
     return best;
   }
   extraFocus(consider, facing) {
@@ -385,7 +385,7 @@ export class Game {
       if (!this.inv.count('comms') || this.inv.count('parts') < 2) { this.toast('电台损坏：需要 通讯设备 + 电子零件×2'); return; }
       this.inv.remove('comms', 1); this.inv.remove('parts', 2); this.radioFixed = true; this.evacLeave = 78;
       const c = o.cells[0]; this.world.set(c[0], c[1], c[2], B.RADIO_ON); o.cells.length = 0; o.cells.push(c); this.world.obj[this.world.idx(c[0], c[1], c[2])] = o.id;
-      this.emit({ type: 'banner', text: '联系上军方了！', sub: '直升机将于第 72 小时降落在北部撤离区，停留到第 78 小时', kind: 'ok' });
+      this.emit({ type: 'banner', text: '联系上军方了！', sub: '直升机将于第 72 小时降落北部撤离区，停留至第 78 小时', kind: 'ok' });
       this.emit({ type: 'radio' });
     } else if (f.kind === 'commsbox' || f.kind === 'medkit') {
       if (o.taken) { this.toast('里面已经空了', true); return; }
@@ -403,7 +403,7 @@ export class Game {
     this.region = rg.id;
     if (!this.visited[rg.id]) {
       this.visited[rg.id] = true;
-      this.emit({ type: 'banner', text: `进入：${rg.name}`, sub: { mart: '货架上可能还有食物和水', police: '装备室里也许有通讯设备', hosp: '小心楼上……', evac: '撤离直升机会在这里降落' }[rg.id] || '', kind: 'ok' });
+      this.emit({ type: 'banner', text: `进入：${rg.name}`, sub: { mart: '货架深处或许还藏着食物和水', police: '装备室里也许还留着通讯设备', hosp: '楼上情况不明，务必小心行事', evac: '撤离直升机的降落点就在此处' }[rg.id] || '', kind: 'ok' });
       this.populate(rg);
     } else this.toast(`进入 ${rg.name}`, true);
   }
@@ -704,7 +704,7 @@ export class Game {
     const T = this.T;
     const wv = this.waves[this.waveIdx];
     if (wv) {
-      if (!wv.warned && T >= wv.warn) { wv.warned = true; this.emit({ type: 'banner', text: `⚠ ${wv.name}将在 2 小时后来袭！`, sub: '加固防线，备好食物和水', kind: 'warn' }); }
+      if (!wv.warned && T >= wv.warn) { wv.warned = true; this.emit({ type: 'banner', text: `⚠ ${wv.name}将在 2 小时后来袭！`, sub: '加固防线，备足食物和水', kind: 'warn' }); }
       if (T >= wv.start) { this.activeWave = { ...wv, idx: this.waveIdx, spawned: 0 }; this.waveIdx++; this.emit({ type: 'banner', text: `${wv.name}来了！`, sub: `约 ${wv.count} 名感染者正在逼近`, kind: 'wave' }); this.emit({ type: 'wave' }); }
     }
     const aw = this.activeWave;
@@ -720,7 +720,7 @@ export class Game {
         aw.bossSpawned = true;
         const [x, z] = this.spawnPoint(24);
         this.boss = this.zm.spawn('boss', x, z, aw.idx + 1);
-        this.emit({ type: 'banner', text: '⚠ 巨型感染者出现了！', sub: '它会砸毁路障——用陷阱和照明灯拖住它', kind: 'wave' }); this.emit({ type: 'boss' });
+        this.emit({ type: 'banner', text: '⚠ 巨型感染者现身！', sub: '它会砸毁路障——用陷阱和照明灯拖住它', kind: 'wave' }); this.emit({ type: 'boss' });
       }
       const remaining = this.zm.list.filter(z => z.wave === aw.idx + 1).length;
       if (aw.spawned >= aw.count && remaining === 0) {

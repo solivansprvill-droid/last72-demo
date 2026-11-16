@@ -1,5 +1,5 @@
 // 入口：组装 逻辑(game) + 渲染(renderer) + 输入/HUD/音效/存档
-import { Game, ENDINGS } from './game/game.js';
+import { Game, ENDINGS, MISSIONS } from './game/game.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
@@ -130,7 +130,7 @@ function start(fromSave) {
   running = true; paused = false; input.enabled = true;
   if (!fromSave) {
     hud.toast('你在公寓里醒来……外面已经沦陷。');
-    setTimeout(() => game && hud.toast('新任务：醒来：走动一下，熟悉操作'), 1200);
+    setTimeout(() => game && hud.toast('新任务：' + MISSIONS[0].text), 1200);
   } else hud.toast('已读取存档');
 }
 $('btnStart').addEventListener('click', () => start(false));
